@@ -21,6 +21,7 @@ import { categorizeIngredient } from "@/utils/recipeExtractor";
 
 const CATEGORIES: { value: IngredientCategory; label: string; emoji: string }[] = [
   { value: "produce", label: "Produce", emoji: "🥬" },
+  { value: "fruits_vegetables", label: "Fruits & Vegetables", emoji: "🍎" },
   { value: "dairy", label: "Dairy & Eggs", emoji: "🥛" },
   { value: "meat", label: "Meat", emoji: "🥩" },
   { value: "seafood", label: "Seafood", emoji: "🐟" },

@@ -16,6 +16,7 @@ import { GroceryList, GroceryItem } from "@/types";
 
 const CATEGORY_LABELS: Record<string, string> = {
   produce: "🥬 Produce",
+  fruits_vegetables: "🍎 Fruits & Vegetables",
   dairy: "🥛 Dairy & Eggs",
   meat: "🥩 Meat",
   seafood: "🐟 Seafood",

@@ -6,17 +6,24 @@ function generateId(): string {
 
 export function categorizeIngredient(name: string): IngredientCategory {
   const lower = name.toLowerCase();
-  const produceKeywords = [
+  const fruitsVegetablesKeywords = [
+    "apple", "banana", "orange", "strawberry", "blueberry", "raspberry",
+    "grape", "pineapple", "peach", "pear", "plum", "cherry", "watermelon",
+    "cantaloupe", "honeydew", "mango", "lime", "lemon", "avocado", "kiwi",
+    "papaya", "coconut", "fig", "pomegranate", "apricot", "nectarine",
+    "grapefruit", "tangerine", "clementine", "cranberry", "blackberry",
     "tomato", "onion", "garlic", "pepper", "lettuce", "carrot", "potato",
-    "mango", "lime", "lemon", "basil", "cilantro", "ginger", "avocado",
-    "cabbage", "chili", "cucumber", "spinach", "kale", "broccoli", "celery",
+    "cabbage", "cucumber", "spinach", "kale", "broccoli", "celery",
     "mushroom", "zucchini", "squash", "asparagus", "corn", "pea", "bean sprout",
-    "scallion", "shallot", "leek", "dill", "parsley", "rosemary", "thyme",
-    "mint", "sage", "chive", "arugula", "radish", "beet", "turnip", "fennel",
-    "artichoke", "eggplant", "bell pepper", "jalapeno", "serrano", "habanero",
-    "poblano", "green onion", "spring onion", "apple", "banana", "orange",
-    "strawberry", "blueberry", "raspberry", "grape", "pineapple", "peach",
-    "pear", "plum", "cherry", "watermelon", "cantaloupe", "honeydew",
+    "scallion", "shallot", "leek", "arugula", "radish", "beet", "turnip",
+    "fennel", "artichoke", "eggplant", "bell pepper", "jalapeno", "serrano",
+    "habanero", "poblano", "green onion", "spring onion", "cauliflower",
+    "sweet potato", "yam", "okra", "bok choy", "brussels sprout",
+  ];
+  const produceKeywords = [
+    "basil", "cilantro", "ginger", "chili",
+    "dill", "parsley", "rosemary", "thyme",
+    "mint", "sage", "chive",
   ];
   const dairyKeywords = [
     "milk", "cheese", "cream", "butter", "yogurt", "egg", "sour cream",
@@ -42,6 +49,7 @@ export function categorizeIngredient(name: string): IngredientCategory {
   ];
   const bakeryKeywords = ["bread", "tortilla", "bun", "roll", "pita", "naan", "flatbread", "croissant", "bagel"];
 
+  if (fruitsVegetablesKeywords.some((k) => lower.includes(k))) return "fruits_vegetables";
   if (produceKeywords.some((k) => lower.includes(k))) return "produce";
   if (dairyKeywords.some((k) => lower.includes(k))) return "dairy";
   if (meatKeywords.some((k) => lower.includes(k))) return "meat";

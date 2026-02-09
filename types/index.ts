@@ -18,6 +18,7 @@ export interface Ingredient {
 
 export type IngredientCategory =
   | "produce"
+  | "fruits_vegetables"
   | "dairy"
   | "meat"
   | "seafood"
