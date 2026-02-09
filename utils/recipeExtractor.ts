@@ -14,7 +14,9 @@ export function categorizeIngredient(name: string): IngredientCategory {
     "scallion", "shallot", "leek", "dill", "parsley", "rosemary", "thyme",
     "mint", "sage", "chive", "arugula", "radish", "beet", "turnip", "fennel",
     "artichoke", "eggplant", "bell pepper", "jalapeno", "serrano", "habanero",
-    "poblano", "green onion", "spring onion",
+    "poblano", "green onion", "spring onion", "apple", "banana", "orange",
+    "strawberry", "blueberry", "raspberry", "grape", "pineapple", "peach",
+    "pear", "plum", "cherry", "watermelon", "cantaloupe", "honeydew",
   ];
   const dairyKeywords = [
     "milk", "cheese", "cream", "butter", "yogurt", "egg", "sour cream",
@@ -47,6 +49,88 @@ export function categorizeIngredient(name: string): IngredientCategory {
   if (spiceKeywords.some((k) => lower.includes(k))) return "spices";
   if (bakeryKeywords.some((k) => lower.includes(k))) return "bakery";
   return "pantry";
+}
+
+export function parseIngredientString(raw: string): { name: string; quantity: string; unit: string } {
+  const cleaned = raw.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+
+  const unitPatterns = [
+    "cups?", "tablespoons?", "tbsps?", "teaspoons?", "tsps?",
+    "ounces?", "oz", "pounds?", "lbs?", "grams?", "g",
+    "kilograms?", "kg", "milliliters?", "ml", "liters?", "l",
+    "pinch(?:es)?", "dash(?:es)?", "cloves?", "slices?", "pieces?",
+    "stalks?", "sprigs?", "bunche?s?", "heads?", "cans?",
+    "packages?", "pkgs?", "containers?", "bags?", "boxes?",
+    "jars?", "bottles?", "sticks?", "large", "medium", "small",
+    "whole", "halve?s?", "quarters?", "inch(?:es)?",
+  ];
+
+  const numberPattern = /^([\d\s\/\.\-–—¼½¾⅓⅔⅛⅜⅝⅞]+)/;
+  const numberMatch = cleaned.match(numberPattern);
+  let quantity = "";
+  let rest = cleaned;
+
+  if (numberMatch) {
+    quantity = numberMatch[1].trim()
+      .replace("¼", "1/4").replace("½", "1/2").replace("¾", "3/4")
+      .replace("⅓", "1/3").replace("⅔", "2/3").replace("⅛", "1/8")
+      .replace("⅜", "3/8").replace("⅝", "5/8").replace("⅞", "7/8");
+    rest = cleaned.slice(numberMatch[0].length).trim();
+  }
+
+  const unitRegex = new RegExp(`^(${unitPatterns.join("|")})\\.?\\s+`, "i");
+  const unitMatch = rest.match(unitRegex);
+  let unit = "";
+
+  if (unitMatch) {
+    unit = unitMatch[1].toLowerCase();
+    rest = rest.slice(unitMatch[0].length).trim();
+  }
+
+  const name = rest.replace(/,.*$/, "").replace(/\(.*?\)/g, "").trim();
+
+  return { name: name || cleaned, quantity, unit };
+}
+
+export function createIngredientFromText(text: string): Ingredient {
+  const parsed = parseIngredientString(text);
+  return {
+    id: generateId(),
+    name: parsed.name,
+    quantity: parsed.quantity,
+    unit: parsed.unit,
+    category: categorizeIngredient(parsed.name),
+  };
+}
+
+export interface RecipeMetadata {
+  title: string;
+  source: string;
+  imageUrl: string;
+  ingredients: Ingredient[];
+}
+
+function extractDomain(url: string): string {
+  try {
+    return new URL(url).hostname.replace("www.", "");
+  } catch {
+    return "Unknown";
+  }
+}
+
+function titleFromUrl(url: string): string {
+  try {
+    const pathname = new URL(url).pathname;
+    const slug = pathname.split("/").filter(Boolean).pop() ?? "";
+    return slug
+      .replace(/[-_]/g, " ")
+      .replace(/\.\w+$/, "")
+      .split(" ")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+  } catch {
+    return "Untitled Recipe";
+  }
 }
 
 interface JsonLdRecipe {
@@ -89,55 +173,14 @@ function findRecipeInJsonLd(data: unknown): JsonLdRecipe | null {
 }
 
 function extractImageUrl(image: JsonLdRecipe["image"]): string {
-  if (!image) return "https://images.unsplash.com/photo-1495521821757-a1efb6729352?w=800&q=80";
+  if (!image) return "";
   if (typeof image === "string") return image;
   if (Array.isArray(image)) {
     const first = image[0];
     if (typeof first === "string") return first;
     if (first && typeof first === "object" && "url" in first) return first.url ?? "";
   }
-  return "https://images.unsplash.com/photo-1495521821757-a1efb6729352?w=800&q=80";
-}
-
-function parseIngredientString(raw: string): { name: string; quantity: string; unit: string } {
-  const cleaned = raw.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
-
-  const unitPatterns = [
-    "cups?", "tablespoons?", "tbsps?", "teaspoons?", "tsps?",
-    "ounces?", "oz", "pounds?", "lbs?", "grams?", "g",
-    "kilograms?", "kg", "milliliters?", "ml", "liters?", "l",
-    "pinch(?:es)?", "dash(?:es)?", "cloves?", "slices?", "pieces?",
-    "stalks?", "sprigs?", "bunche?s?", "heads?", "cans?",
-    "packages?", "pkgs?", "containers?", "bags?", "boxes?",
-    "jars?", "bottles?", "sticks?", "large", "medium", "small",
-    "whole", "halve?s?", "quarters?", "inch(?:es)?",
-  ];
-
-  const numberPattern = /^([\d\s\/\.\-–—¼½¾⅓⅔⅛⅜⅝⅞]+)/;
-  const numberMatch = cleaned.match(numberPattern);
-  let quantity = "";
-  let rest = cleaned;
-
-  if (numberMatch) {
-    quantity = numberMatch[1].trim()
-      .replace("¼", "1/4").replace("½", "1/2").replace("¾", "3/4")
-      .replace("⅓", "1/3").replace("⅔", "2/3").replace("⅛", "1/8")
-      .replace("⅜", "3/8").replace("⅝", "5/8").replace("⅞", "7/8");
-    rest = cleaned.slice(numberMatch[0].length).trim();
-  }
-
-  const unitRegex = new RegExp(`^(${unitPatterns.join("|")})\\.?\\s+`, "i");
-  const unitMatch = rest.match(unitRegex);
-  let unit = "";
-
-  if (unitMatch) {
-    unit = unitMatch[1].toLowerCase();
-    rest = rest.slice(unitMatch[0].length).trim();
-  }
-
-  const name = rest.replace(/,.*$/, "").replace(/\(.*?\)/g, "").trim();
-
-  return { name: name || cleaned, quantity, unit };
+  return "";
 }
 
 function extractJsonLdFromHtml(html: string): unknown[] {
@@ -149,230 +192,128 @@ function extractJsonLdFromHtml(html: string): unknown[] {
       const parsed = JSON.parse(match[1]);
       results.push(parsed);
     } catch (e) {
-      console.log("Failed to parse JSON-LD block:", e);
+      console.log("[RecipeExtractor] Failed to parse JSON-LD block:", e);
     }
   }
   return results;
 }
 
-function extractRecipeFromHtmlFallback(html: string): { title: string; ingredients: string[] } | null {
-  const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
-  const title = titleMatch ? titleMatch[1].replace(/<[^>]*>/g, "").trim() : "";
+function extractOgFromHtml(html: string): { title: string; image: string } {
+  const ogTitle = html.match(/<meta[^>]*property\s*=\s*["']og:title["'][^>]*content\s*=\s*["']([^"']+)["']/i)?.[1]
+    ?? html.match(/<meta[^>]*content\s*=\s*["']([^"']+)["'][^>]*property\s*=\s*["']og:title["']/i)?.[1]
+    ?? "";
+  const ogImage = html.match(/<meta[^>]*property\s*=\s*["']og:image["'][^>]*content\s*=\s*["']([^"']+)["']/i)?.[1]
+    ?? html.match(/<meta[^>]*content\s*=\s*["']([^"']+)["'][^>]*property\s*=\s*["']og:image["']/i)?.[1]
+    ?? "";
+  const titleTag = html.match(/<title[^>]*>(.*?)<\/title>/i)?.[1]?.replace(/<[^>]*>/g, "").trim() ?? "";
 
-  const ingredients: string[] = [];
-  const ingredientPatterns = [
-    /class\s*=\s*["'][^"']*ingredient[^"']*["'][^>]*>([\s\S]*?)<\//gi,
-    /itemprop\s*=\s*["']recipeIngredient["'][^>]*>([\s\S]*?)<\//gi,
+  return {
+    title: ogTitle || titleTag,
+    image: ogImage,
+  };
+}
+
+const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1495521821757-a1efb6729352?w=800&q=80";
+
+async function tryFetchHtml(url: string): Promise<string | null> {
+  const proxyUrls = [
+    `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+    `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
   ];
 
-  for (const pattern of ingredientPatterns) {
-    let m: RegExpExecArray | null;
-    while ((m = pattern.exec(html)) !== null) {
-      const text = m[1].replace(/<[^>]*>/g, "").trim();
-      if (text && text.length > 2 && text.length < 200) {
-        ingredients.push(text);
+  for (const proxyUrl of proxyUrls) {
+    try {
+      console.log("[RecipeExtractor] Trying proxy:", proxyUrl.split("?")[0]);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const response = await fetch(proxyUrl, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) continue;
+
+      if (proxyUrl.includes("allorigins")) {
+        const json = await response.json();
+        if (json?.contents && json.contents.length > 200) {
+          console.log("[RecipeExtractor] Got HTML via allorigins, length:", json.contents.length);
+          return json.contents as string;
+        }
+      } else {
+        const text = await response.text();
+        if (text && text.length > 200) {
+          console.log("[RecipeExtractor] Got HTML via proxy, length:", text.length);
+          return text;
+        }
       }
+    } catch (err) {
+      console.log("[RecipeExtractor] Proxy failed:", err);
     }
   }
 
-  if (ingredients.length > 0) {
-    return { title, ingredients };
+  try {
+    console.log("[RecipeExtractor] Trying direct fetch...");
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+    });
+    clearTimeout(timeoutId);
+    if (response.ok) {
+      const text = await response.text();
+      if (text.length > 200) {
+        console.log("[RecipeExtractor] Direct fetch succeeded, length:", text.length);
+        return text;
+      }
+    }
+  } catch (err) {
+    console.log("[RecipeExtractor] Direct fetch failed:", err);
   }
+
   return null;
 }
 
-async function fetchWithTimeout(fetchFn: () => Promise<Response>, timeoutMs: number = 10000): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetchFn();
-    clearTimeout(timeoutId);
-    return response;
-  } catch (err) {
-    clearTimeout(timeoutId);
-    throw err;
-  }
-}
+export async function extractRecipeMetadata(url: string): Promise<RecipeMetadata> {
+  console.log("[RecipeExtractor] Extracting metadata for:", url);
 
-function getAllOriginsJsonUrl(url: string): string {
-  return `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-}
+  const source = extractDomain(url);
+  const fallbackTitle = titleFromUrl(url);
 
-async function fetchWithFallbacks(url: string): Promise<string> {
-  const strategies: { name: string; fetchFn: () => Promise<string> }[] = [
-    {
-      name: "direct",
-      fetchFn: async () => {
-        const response = await fetchWithTimeout(() =>
-          fetch(url, {
-            headers: {
-              "User-Agent":
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-              Accept:
-                "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-              "Accept-Language": "en-US,en;q=0.9",
-            },
-          })
-        );
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.text();
-      },
-    },
-    {
-      name: "allorigins-json",
-      fetchFn: async () => {
-        const response = await fetchWithTimeout(() =>
-          fetch(getAllOriginsJsonUrl(url))
-        );
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const json = await response.json();
-        if (json && json.contents) return json.contents as string;
-        throw new Error("No contents in response");
-      },
-    },
-    {
-      name: "allorigins-raw",
-      fetchFn: async () => {
-        const response = await fetchWithTimeout(() =>
-          fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`)
-        );
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.text();
-      },
-    },
-    {
-      name: "corsproxy",
-      fetchFn: async () => {
-        const response = await fetchWithTimeout(() =>
-          fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`)
-        );
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.text();
-      },
-    },
-    {
-      name: "cors-anywhere-herokuapp",
-      fetchFn: async () => {
-        const response = await fetchWithTimeout(() =>
-          fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`)
-        );
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.text();
-      },
-    },
-    {
-      name: "google-cache",
-      fetchFn: async () => {
-        const response = await fetchWithTimeout(() =>
-          fetch(`https://webcache.googleusercontent.com/search?q=cache:${encodeURIComponent(url)}`)
-        );
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.text();
-      },
-    },
-  ];
+  let title = fallbackTitle;
+  let imageUrl = FALLBACK_IMAGE;
+  let ingredients: Ingredient[] = [];
 
-  for (const strategy of strategies) {
-    try {
-      console.log(`[RecipeExtractor] Trying ${strategy.name} fetch...`);
-      const html = await strategy.fetchFn();
-      if (html && html.length > 500) {
-        console.log(
-          `[RecipeExtractor] ${strategy.name} succeeded, HTML length: ${html.length}`
-        );
-        return html;
+  const html = await tryFetchHtml(url);
+
+  if (html) {
+    const og = extractOgFromHtml(html);
+    if (og.title) title = og.title;
+    if (og.image) imageUrl = og.image;
+
+    const jsonLdBlocks = extractJsonLdFromHtml(html);
+    console.log("[RecipeExtractor] Found JSON-LD blocks:", jsonLdBlocks.length);
+
+    for (const block of jsonLdBlocks) {
+      const recipeData = findRecipeInJsonLd(block);
+      if (recipeData) {
+        if (recipeData.name) title = recipeData.name;
+        const recipeImage = extractImageUrl(recipeData.image);
+        if (recipeImage) imageUrl = recipeImage;
+
+        if (recipeData.recipeIngredient && recipeData.recipeIngredient.length > 0) {
+          console.log("[RecipeExtractor] Found structured ingredients:", recipeData.recipeIngredient.length);
+          ingredients = recipeData.recipeIngredient.map((raw) => createIngredientFromText(raw));
+        }
+        break;
       }
-      console.log(
-        `[RecipeExtractor] ${strategy.name} returned too little content (${html?.length ?? 0} chars), trying next...`
-      );
-    } catch (err) {
-      console.log(`[RecipeExtractor] ${strategy.name} failed:`, err);
     }
+  } else {
+    console.log("[RecipeExtractor] Could not fetch HTML - using URL-derived metadata only");
   }
 
-  throw new Error(
-    "Could not fetch the recipe page. The website may be blocking access. Please try a different recipe link."
-  );
-}
+  console.log("[RecipeExtractor] Result:", { title, source, imageUrl: imageUrl.substring(0, 60), ingredientCount: ingredients.length });
 
-export async function extractRecipeFromUrl(url: string): Promise<{
-  title: string;
-  source: string;
-  imageUrl: string;
-  ingredients: Ingredient[];
-}> {
-  console.log("[RecipeExtractor] Fetching URL:", url);
-
-  let html: string;
-  try {
-    html = await fetchWithFallbacks(url);
-  } catch (err) {
-    console.error("[RecipeExtractor] All fetch strategies failed:", err);
-    throw err instanceof Error
-      ? err
-      : new Error("Could not fetch the recipe page. Please check the URL and try again.");
-  }
-
-  const urlObj = (() => {
-    try { return new URL(url); } catch { return null; }
-  })();
-  const source = urlObj ? urlObj.hostname.replace("www.", "") : "Unknown";
-
-  const jsonLdBlocks = extractJsonLdFromHtml(html);
-  console.log("[RecipeExtractor] Found JSON-LD blocks:", jsonLdBlocks.length);
-
-  let recipeData: JsonLdRecipe | null = null;
-  for (const block of jsonLdBlocks) {
-    recipeData = findRecipeInJsonLd(block);
-    if (recipeData) break;
-  }
-
-  if (recipeData && recipeData.recipeIngredient && recipeData.recipeIngredient.length > 0) {
-    console.log("[RecipeExtractor] Found recipe via JSON-LD:", recipeData.name);
-    console.log("[RecipeExtractor] Ingredients count:", recipeData.recipeIngredient.length);
-
-    const ingredients: Ingredient[] = recipeData.recipeIngredient.map((raw) => {
-      const parsed = parseIngredientString(raw);
-      return {
-        id: generateId(),
-        name: parsed.name,
-        quantity: parsed.quantity,
-        unit: parsed.unit,
-        category: categorizeIngredient(parsed.name),
-      };
-    });
-
-    return {
-      title: recipeData.name ?? "Untitled Recipe",
-      source,
-      imageUrl: extractImageUrl(recipeData.image),
-      ingredients,
-    };
-  }
-
-  console.log("[RecipeExtractor] No JSON-LD recipe found, trying HTML fallback...");
-  const fallback = extractRecipeFromHtmlFallback(html);
-  if (fallback && fallback.ingredients.length > 0) {
-    console.log("[RecipeExtractor] Fallback found ingredients:", fallback.ingredients.length);
-
-    const ingredients: Ingredient[] = fallback.ingredients.map((raw) => {
-      const parsed = parseIngredientString(raw);
-      return {
-        id: generateId(),
-        name: parsed.name,
-        quantity: parsed.quantity,
-        unit: parsed.unit,
-        category: categorizeIngredient(parsed.name),
-      };
-    });
-
-    return {
-      title: fallback.title || "Untitled Recipe",
-      source,
-      imageUrl: "https://images.unsplash.com/photo-1495521821757-a1efb6729352?w=800&q=80",
-      ingredients,
-    };
-  }
-
-  throw new Error("Could not find recipe data on this page. Try a different recipe link.");
+  return { title, source, imageUrl, ingredients };
 }
