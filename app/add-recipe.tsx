@@ -289,7 +289,7 @@ export default function AddRecipeScreen() {
               </Animated.View>
               <Text style={styles.extractButtonText}>
                 {isFetchingVideo
-                  ? (url.trim() && isInstagramUrl(url.trim()) ? "Extracting reel..." : "Transcribing video...")
+                  ? (url.trim() && isInstagramUrl(url.trim()) ? "Extracting reel..." : "Transcribing video (may use AI)...")
                   : "Loading recipe info..."}
               </Text>
             </>
@@ -314,7 +314,7 @@ export default function AddRecipeScreen() {
           <View style={styles.tipNumber}>
             <Text style={styles.tipNumberText}>2</Text>
           </View>
-          <Text style={styles.tipText}>Videos are auto-transcribed to find ingredients</Text>
+          <Text style={styles.tipText}>Videos are auto-transcribed with AI speech-to-text fallback</Text>
         </View>
         <View style={styles.tipRow}>
           <View style={styles.tipNumber}>

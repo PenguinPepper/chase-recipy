@@ -656,13 +656,159 @@ async function extractInstagramRecipe(url: string): Promise<VideoRecipeResult> {
   };
 }
 
+const ASSEMBLYAI_API_KEY = process.env.EXPO_PUBLIC_ASSEMBLYAI_API_KEY ?? "";
+
+interface AssemblyAITranscriptResponse {
+  id: string;
+  status: "queued" | "processing" | "completed" | "error";
+  text?: string;
+  words?: { text: string; start: number; end: number }[];
+  error?: string;
+}
+
+async function transcribeWithAssemblyAI(videoUrl: string): Promise<TranscriptSegment[]> {
+  if (!ASSEMBLYAI_API_KEY) {
+    console.log("[AssemblyAI] No API key configured, skipping");
+    return [];
+  }
+
+  console.log("[AssemblyAI] Starting transcription for:", videoUrl);
+
+  try {
+    const submitResponse = await fetch("https://api.assemblyai.com/v2/transcript", {
+      method: "POST",
+      headers: {
+        "Authorization": ASSEMBLYAI_API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        audio_url: videoUrl,
+        language_code: "en",
+      }),
+    });
+
+    if (!submitResponse.ok) {
+      const errBody = await submitResponse.text();
+      console.log("[AssemblyAI] Submit failed:", submitResponse.status, errBody);
+      return [];
+    }
+
+    const submitData = (await submitResponse.json()) as AssemblyAITranscriptResponse;
+    const transcriptId = submitData.id;
+    console.log("[AssemblyAI] Transcript ID:", transcriptId, "Status:", submitData.status);
+
+    const pollUrl = `https://api.assemblyai.com/v2/transcript/${transcriptId}`;
+    const maxAttempts = 60;
+    const pollInterval = 3000;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+
+      const pollResponse = await fetch(pollUrl, {
+        headers: { "Authorization": ASSEMBLYAI_API_KEY },
+      });
+
+      if (!pollResponse.ok) {
+        console.log("[AssemblyAI] Poll failed:", pollResponse.status);
+        continue;
+      }
+
+      const pollData = (await pollResponse.json()) as AssemblyAITranscriptResponse;
+      console.log("[AssemblyAI] Poll attempt", attempt + 1, "status:", pollData.status);
+
+      if (pollData.status === "completed") {
+        if (!pollData.text) {
+          console.log("[AssemblyAI] Completed but no text returned");
+          return [];
+        }
+
+        console.log("[AssemblyAI] Transcription complete, text length:", pollData.text.length);
+
+        if (pollData.words && pollData.words.length > 0) {
+          const segments: TranscriptSegment[] = [];
+          let currentSegment = "";
+          let segmentStart = pollData.words[0].start / 1000;
+
+          for (let i = 0; i < pollData.words.length; i++) {
+            const word = pollData.words[i];
+            currentSegment += (currentSegment ? " " : "") + word.text;
+
+            const isEnd = currentSegment.endsWith(".") || currentSegment.endsWith("!") || currentSegment.endsWith("?");
+            const isLong = currentSegment.split(" ").length >= 12;
+            const isLast = i === pollData.words.length - 1;
+
+            if (isEnd || isLong || isLast) {
+              const endTime = word.end / 1000;
+              segments.push({
+                text: currentSegment.trim(),
+                start: segmentStart,
+                duration: endTime - segmentStart,
+              });
+              currentSegment = "";
+              if (i + 1 < pollData.words.length) {
+                segmentStart = pollData.words[i + 1].start / 1000;
+              }
+            }
+          }
+
+          console.log("[AssemblyAI] Created", segments.length, "segments from words");
+          return segments;
+        }
+
+        const sentences = pollData.text.split(/[.!?]+/).filter((s) => s.trim());
+        return sentences.map((s, idx) => ({
+          text: s.trim(),
+          start: idx * 5,
+          duration: 5,
+        }));
+      }
+
+      if (pollData.status === "error") {
+        console.log("[AssemblyAI] Transcription error:", pollData.error);
+        return [];
+      }
+    }
+
+    console.log("[AssemblyAI] Transcription timed out after", maxAttempts, "attempts");
+    return [];
+  } catch (err) {
+    console.log("[AssemblyAI] Error:", err);
+    return [];
+  }
+}
+
+function getDirectVideoUrl(url: string, platform: "youtube" | "instagram" | "unknown", videoId: string): string {
+  if (platform === "youtube") {
+    return `https://www.youtube.com/watch?v=${videoId}`;
+  }
+  return url;
+}
+
 export async function extractVideoRecipe(url: string): Promise<VideoRecipeResult> {
   console.log("[VideoExtractor] Starting extraction for:", url);
 
   const platform = getVideoPlatform(url);
 
   if (platform === "instagram") {
-    return extractInstagramRecipe(url);
+    const result = await extractInstagramRecipe(url);
+
+    if (result.ingredients.length === 0 && (!result.fullText || result.fullText.length < 50)) {
+      console.log("[VideoExtractor] Instagram extraction yielded little content, trying AssemblyAI...");
+      const aiSegments = await transcribeWithAssemblyAI(url);
+      if (aiSegments.length > 0) {
+        const aiFullText = aiSegments.map((s) => s.text).join(" ");
+        const aiIngredients = extractIngredientsFromTranscript(aiSegments);
+        console.log("[VideoExtractor] AssemblyAI fallback found", aiIngredients.length, "ingredients");
+        return {
+          ...result,
+          transcript: aiSegments,
+          fullText: aiFullText,
+          ingredients: aiIngredients.length > 0 ? aiIngredients : result.ingredients,
+        };
+      }
+    }
+
+    return result;
   }
 
   const videoId = extractYouTubeId(url);
@@ -673,8 +819,19 @@ export async function extractVideoRecipe(url: string): Promise<VideoRecipeResult
   console.log("[VideoExtractor] Detected YouTube video ID:", videoId);
 
   const metadata = await fetchYouTubeMetadata(videoId);
-  const transcript = await fetchYouTubeTranscript(videoId);
-  const fullText = transcript.map((s) => s.text).join(" ");
+  let transcript = await fetchYouTubeTranscript(videoId);
+  let fullText = transcript.map((s) => s.text).join(" ");
+
+  if (transcript.length === 0) {
+    console.log("[VideoExtractor] No YouTube captions found, trying AssemblyAI...");
+    const directUrl = getDirectVideoUrl(url, platform, videoId);
+    transcript = await transcribeWithAssemblyAI(directUrl);
+    fullText = transcript.map((s) => s.text).join(" ");
+
+    if (transcript.length > 0) {
+      console.log("[VideoExtractor] AssemblyAI fallback succeeded with", transcript.length, "segments");
+    }
+  }
 
   let ingredients: Ingredient[] = [];
   if (transcript.length > 0) {
