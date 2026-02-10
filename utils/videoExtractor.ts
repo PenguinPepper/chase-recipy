@@ -6,7 +6,7 @@ export interface VideoMetadata {
   thumbnailUrl: string;
   source: string;
   videoId: string;
-  platform: "youtube" | "unknown";
+  platform: "youtube" | "instagram" | "unknown";
 }
 
 export interface TranscriptSegment {
@@ -20,6 +20,20 @@ export interface VideoRecipeResult {
   transcript: TranscriptSegment[];
   fullText: string;
   ingredients: Ingredient[];
+}
+
+function extractInstagramReelId(url: string): string | null {
+  const patterns = [
+    /instagram\.com\/reel\/([a-zA-Z0-9_-]+)/,
+    /instagram\.com\/reels\/([a-zA-Z0-9_-]+)/,
+    /instagram\.com\/p\/([a-zA-Z0-9_-]+)/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match?.[1]) return match[1];
+  }
+  return null;
 }
 
 function extractYouTubeId(url: string): string | null {
@@ -39,13 +53,29 @@ function extractYouTubeId(url: string): string | null {
   return null;
 }
 
+export function isInstagramUrl(url: string): boolean {
+  const lower = url.toLowerCase();
+  return (
+    lower.includes("instagram.com/reel") ||
+    lower.includes("instagram.com/reels") ||
+    lower.includes("instagram.com/p/")
+  );
+}
+
 export function isVideoUrl(url: string): boolean {
   const lower = url.toLowerCase();
   return (
     lower.includes("youtube.com") ||
     lower.includes("youtu.be") ||
-    lower.includes("youtube.com/shorts")
+    lower.includes("youtube.com/shorts") ||
+    isInstagramUrl(url)
   );
+}
+
+export function getVideoPlatform(url: string): "youtube" | "instagram" | "unknown" {
+  if (isInstagramUrl(url)) return "instagram";
+  if (url.toLowerCase().includes("youtube.com") || url.toLowerCase().includes("youtu.be")) return "youtube";
+  return "unknown";
 }
 
 async function fetchYouTubeMetadata(videoId: string): Promise<VideoMetadata> {
@@ -357,12 +387,287 @@ export function formatTimestamp(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
+async function fetchInstagramMetadata(reelId: string, url: string): Promise<VideoMetadata> {
+  console.log("[VideoExtractor] Fetching Instagram metadata for reel:", reelId);
+
+  const oembedUrl = `https://api.instagram.com/oembed/?url=${encodeURIComponent(url)}`;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const response = await fetch(oembedUrl, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log("[VideoExtractor] Instagram oEmbed title:", data.title);
+      return {
+        title: data.title ?? "Instagram Reel",
+        thumbnailUrl: data.thumbnail_url ?? "https://images.unsplash.com/photo-1495521821757-a1efb6729352?w=800&q=80",
+        source: "instagram.com",
+        videoId: reelId,
+        platform: "instagram",
+      };
+    }
+    console.log("[VideoExtractor] Instagram oEmbed response not ok:", response.status);
+  } catch (err) {
+    console.log("[VideoExtractor] Instagram oEmbed fetch failed:", err);
+  }
+
+  return {
+    title: "Instagram Reel",
+    thumbnailUrl: "https://images.unsplash.com/photo-1495521821757-a1efb6729352?w=800&q=80",
+    source: "instagram.com",
+    videoId: reelId,
+    platform: "instagram",
+  };
+}
+
+async function fetchInstagramCaption(url: string): Promise<string> {
+  console.log("[VideoExtractor] Fetching Instagram caption for:", url);
+
+  const proxyUrls = [
+    `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+    `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  ];
+
+  for (const proxyUrl of proxyUrls) {
+    try {
+      console.log("[VideoExtractor] Trying proxy for Instagram page:", proxyUrl.split("?")[0]);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const response = await fetch(proxyUrl, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) continue;
+
+      let html: string;
+      if (proxyUrl.includes("allorigins")) {
+        const json = await response.json();
+        html = json?.contents ?? "";
+      } else {
+        html = await response.text();
+      }
+
+      if (!html || html.length < 200) continue;
+
+      let caption = "";
+
+      const ogDescMatch = html.match(
+        /<meta[^>]*property\s*=\s*["']og:description["'][^>]*content\s*=\s*["']([^"']+)["']/i
+      ) ?? html.match(
+        /<meta[^>]*content\s*=\s*["']([^"']+)["'][^>]*property\s*=\s*["']og:description["']/i
+      );
+      if (ogDescMatch?.[1]) {
+        caption = ogDescMatch[1];
+        console.log("[VideoExtractor] Found og:description caption, length:", caption.length);
+      }
+
+      if (!caption) {
+        const descMatch = html.match(
+          /<meta[^>]*name\s*=\s*["']description["'][^>]*content\s*=\s*["']([^"']+)["']/i
+        );
+        if (descMatch?.[1]) {
+          caption = descMatch[1];
+          console.log("[VideoExtractor] Found meta description caption, length:", caption.length);
+        }
+      }
+
+      if (!caption) {
+        const titleMatch = html.match(
+          /<meta[^>]*property\s*=\s*["']og:title["'][^>]*content\s*=\s*["']([^"']+)["']/i
+        );
+        if (titleMatch?.[1]) {
+          caption = titleMatch[1];
+          console.log("[VideoExtractor] Using og:title as caption, length:", caption.length);
+        }
+      }
+
+      const sharedDataMatch = html.match(/window\._sharedData\s*=\s*(\{.+?\});/s);
+      if (sharedDataMatch?.[1]) {
+        try {
+          const sharedData = JSON.parse(sharedDataMatch[1]);
+          const mediaCaption = sharedData?.entry_data?.PostPage?.[0]?.graphql?.shortcode_media?.edge_media_to_caption?.edges?.[0]?.node?.text;
+          if (mediaCaption) {
+            caption = mediaCaption;
+            console.log("[VideoExtractor] Found shared data caption, length:", caption.length);
+          }
+        } catch (e) {
+          console.log("[VideoExtractor] Failed to parse _sharedData:", e);
+        }
+      }
+
+      const additionalDataMatch = html.match(/"caption"\s*:\s*\{[^}]*"text"\s*:\s*"([^"]+)"/s);
+      if (additionalDataMatch?.[1] && (!caption || additionalDataMatch[1].length > caption.length)) {
+        caption = additionalDataMatch[1]
+          .replace(/\\n/g, "\n")
+          .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+        console.log("[VideoExtractor] Found JSON caption text, length:", caption.length);
+      }
+
+      if (caption) {
+        return caption
+          .replace(/&amp;/g, "&")
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'");
+      }
+    } catch (err) {
+      console.log("[VideoExtractor] Instagram proxy failed:", err);
+    }
+  }
+
+  console.log("[VideoExtractor] Could not fetch Instagram caption");
+  return "";
+}
+
+function extractIngredientsFromCaption(caption: string): Ingredient[] {
+  console.log("[VideoExtractor] Extracting ingredients from Instagram caption");
+
+  const lines = caption
+    .split(/[\n\r]+/)
+    .map((l) => l.replace(/^[•\-\*🔸🔹▪️▫️◾◽⬛⬜🟩🟨🟧🟥🟦🟪🟫✅☑️✔️➡️👉🍳🥄🧂🥘🍽️]+\s*/u, "").trim())
+    .filter((l) => l.length > 0);
+
+  const found = new Map<string, string>();
+
+  let isInIngredientSection = false;
+
+  for (const line of lines) {
+    const lower = line.toLowerCase();
+
+    if (INGREDIENT_KEYWORDS.some((kw) => lower.includes(kw))) {
+      isInIngredientSection = true;
+      continue;
+    }
+
+    if (
+      isInIngredientSection &&
+      (lower.includes("instruction") ||
+        lower.includes("direction") ||
+        lower.includes("method") ||
+        lower.includes("step 1") ||
+        lower.includes("how to"))
+    ) {
+      isInIngredientSection = false;
+      continue;
+    }
+
+    if (isInIngredientSection || hasIngredientPattern(line)) {
+      for (const pattern of INGREDIENT_PATTERNS) {
+        pattern.lastIndex = 0;
+        let match: RegExpExecArray | null;
+        while ((match = pattern.exec(line)) !== null) {
+          const cleaned = match[1].trim();
+          const key = cleaned.toLowerCase().replace(/\s+/g, " ");
+          if (!found.has(key)) {
+            found.set(key, cleaned);
+          }
+        }
+      }
+    }
+
+    if (isInIngredientSection) {
+      const cookingNounFound = COOKING_NOUNS.filter((noun) => lower.includes(noun));
+      if (cookingNounFound.length > 0) {
+        const key = line.toLowerCase().replace(/\s+/g, " ").substring(0, 80);
+        if (!found.has(key)) {
+          found.set(key, line.substring(0, 100));
+        }
+      }
+    }
+  }
+
+  if (found.size < 2) {
+    for (const line of lines) {
+      const lower = line.toLowerCase();
+      for (const pattern of INGREDIENT_PATTERNS) {
+        pattern.lastIndex = 0;
+        let match: RegExpExecArray | null;
+        while ((match = pattern.exec(line)) !== null) {
+          const cleaned = match[1].trim();
+          const key = cleaned.toLowerCase().replace(/\s+/g, " ");
+          if (!found.has(key)) {
+            found.set(key, cleaned);
+          }
+        }
+      }
+      if (/\d/.test(lower)) {
+        const nounMatch = COOKING_NOUNS.find((n) => lower.includes(n));
+        if (nounMatch) {
+          const key = line.toLowerCase().replace(/\s+/g, " ").substring(0, 80);
+          if (!found.has(key)) {
+            found.set(key, line.substring(0, 100));
+          }
+        }
+      }
+    }
+  }
+
+  console.log("[VideoExtractor] Instagram caption ingredient candidates:", found.size);
+
+  const ingredients: Ingredient[] = [];
+  for (const raw of found.values()) {
+    try {
+      ingredients.push(createIngredientFromText(raw));
+    } catch (err) {
+      console.log("[VideoExtractor] Failed to parse ingredient from caption:", raw, err);
+    }
+  }
+
+  return ingredients;
+}
+
+async function extractInstagramRecipe(url: string): Promise<VideoRecipeResult> {
+  console.log("[VideoExtractor] Starting Instagram Reel extraction for:", url);
+
+  const reelId = extractInstagramReelId(url);
+  if (!reelId) {
+    throw new Error("Could not detect an Instagram Reel from this URL. Please paste a valid Instagram Reel link.");
+  }
+
+  console.log("[VideoExtractor] Detected Instagram Reel ID:", reelId);
+
+  const metadata = await fetchInstagramMetadata(reelId, url);
+  const caption = await fetchInstagramCaption(url);
+
+  const captionSegments: TranscriptSegment[] = caption
+    ? caption.split(/[\n\r]+/).filter(Boolean).map((line, idx) => ({
+        text: line.trim(),
+        start: idx,
+        duration: 0,
+      }))
+    : [];
+
+  let ingredients: Ingredient[] = [];
+  if (caption) {
+    ingredients = extractIngredientsFromCaption(caption);
+    console.log("[VideoExtractor] Instagram ingredients found:", ingredients.length);
+  } else {
+    console.log("[VideoExtractor] No caption found - user will need to add ingredients manually");
+  }
+
+  return {
+    metadata,
+    transcript: captionSegments,
+    fullText: caption,
+    ingredients,
+  };
+}
+
 export async function extractVideoRecipe(url: string): Promise<VideoRecipeResult> {
   console.log("[VideoExtractor] Starting extraction for:", url);
 
+  const platform = getVideoPlatform(url);
+
+  if (platform === "instagram") {
+    return extractInstagramRecipe(url);
+  }
+
   const videoId = extractYouTubeId(url);
   if (!videoId) {
-    throw new Error("Could not detect a YouTube video from this URL. Please paste a valid YouTube link.");
+    throw new Error("Could not detect a video from this URL. Please paste a valid YouTube or Instagram Reel link.");
   }
 
   console.log("[VideoExtractor] Detected YouTube video ID:", videoId);

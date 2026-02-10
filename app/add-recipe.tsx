@@ -40,6 +40,7 @@ import {
 } from "@/utils/recipeExtractor";
 import {
   isVideoUrl,
+  isInstagramUrl,
   extractVideoRecipe,
   formatTimestamp,
   VideoRecipeResult,
@@ -258,10 +259,18 @@ export default function AddRecipeScreen() {
         </View>
 
         {url.trim() && isVideoUrl(url.trim()) && (
-          <View style={styles.videoDetectedBanner}>
-            <Video size={16} color="#6C3CE0" />
-            <Text style={styles.videoDetectedText}>
-              YouTube video detected — will auto-transcribe
+          <View style={[
+            styles.videoDetectedBanner,
+            isInstagramUrl(url.trim()) && styles.instagramDetectedBanner,
+          ]}>
+            <Video size={16} color={isInstagramUrl(url.trim()) ? "#E1306C" : "#6C3CE0"} />
+            <Text style={[
+              styles.videoDetectedText,
+              isInstagramUrl(url.trim()) && styles.instagramDetectedText,
+            ]}>
+              {isInstagramUrl(url.trim())
+                ? "Instagram Reel detected \u2014 will extract caption & ingredients"
+                : "YouTube video detected \u2014 will auto-transcribe"}
             </Text>
           </View>
         )}
@@ -279,7 +288,9 @@ export default function AddRecipeScreen() {
                 <Loader size={20} color={Colors.textOnPrimary} />
               </Animated.View>
               <Text style={styles.extractButtonText}>
-                {isFetchingVideo ? "Transcribing video..." : "Loading recipe info..."}
+                {isFetchingVideo
+                  ? (url.trim() && isInstagramUrl(url.trim()) ? "Extracting reel..." : "Transcribing video...")
+                  : "Loading recipe info..."}
               </Text>
             </>
           ) : (
@@ -322,6 +333,10 @@ export default function AddRecipeScreen() {
           <View style={[styles.supportedChip, styles.videoChip]}>
             <Video size={12} color="#6C3CE0" />
             <Text style={[styles.supportedChipText, { color: "#6C3CE0" }]}>YouTube videos</Text>
+          </View>
+          <View style={[styles.supportedChip, styles.instagramChip]}>
+            <Video size={12} color="#E1306C" />
+            <Text style={[styles.supportedChipText, { color: "#E1306C" }]}>Instagram Reels</Text>
           </View>
         </View>
       </View>
@@ -778,6 +793,16 @@ const styles = StyleSheet.create({
   },
   videoChip: {
     backgroundColor: "#F3EEFF",
+  },
+  instagramChip: {
+    backgroundColor: "#FFF0F5",
+  },
+  instagramDetectedBanner: {
+    backgroundColor: "#FFF0F5",
+    borderColor: "#FFD6E7",
+  },
+  instagramDetectedText: {
+    color: "#E1306C",
   },
   supportedChipText: {
     fontSize: 12,
