@@ -1,6 +1,6 @@
 import { Image } from "expo-image";
 import { useRouter, Stack } from "expo-router";
-import { Plus, Link2, Clock, Trash2 } from "lucide-react-native";
+import { Plus, Link2, Clock, Trash2, UtensilsCrossed } from "lucide-react-native";
 import React, { useCallback } from "react";
 import {
   View,
@@ -54,6 +54,12 @@ export default function RecipesScreen() {
             style={styles.cardImage}
             contentFit="cover"
           />
+          <View style={styles.cardOverlay}>
+            <View style={styles.timeBadge}>
+              <Clock size={10} color="#FFFFFF" />
+              <Text style={styles.timeBadgeText}>{timeAgo}</Text>
+            </View>
+          </View>
           <View style={styles.cardContent}>
             <Text style={styles.cardTitle} numberOfLines={2}>
               {item.title}
@@ -61,15 +67,12 @@ export default function RecipesScreen() {
             <View style={styles.cardMeta}>
               <View style={styles.metaItem}>
                 <Link2 size={12} color={Colors.textTertiary} />
-                <Text style={styles.metaText}>{item.source}</Text>
-              </View>
-              <View style={styles.metaItem}>
-                <Clock size={12} color={Colors.textTertiary} />
-                <Text style={styles.metaText}>{timeAgo}</Text>
+                <Text style={styles.metaText} numberOfLines={1}>{item.source}</Text>
               </View>
             </View>
             <View style={styles.cardFooter}>
               <View style={styles.ingredientBadge}>
+                <UtensilsCrossed size={11} color={Colors.primary} />
                 <Text style={styles.ingredientCount}>
                   {item.ingredients.length} ingredients
                 </Text>
@@ -77,9 +80,10 @@ export default function RecipesScreen() {
               <TouchableOpacity
                 onPress={() => handleDelete(item)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                style={styles.deleteButton}
                 testID={`delete-recipe-${item.id}`}
               >
-                <Trash2 size={16} color={Colors.textTertiary} />
+                <Trash2 size={15} color={Colors.textTertiary} />
               </TouchableOpacity>
             </View>
           </View>
@@ -93,17 +97,18 @@ export default function RecipesScreen() {
     () => (
       <View style={styles.emptyContainer}>
         <View style={styles.emptyIconContainer}>
-          <View style={styles.bookIcon}>
-            <Text style={styles.bookIconText}>📖</Text>
+          <View style={styles.potIcon}>
+            <Text style={styles.potIconText}>🍲</Text>
           </View>
         </View>
         <Text style={styles.emptyTitle}>No recipes yet</Text>
         <Text style={styles.emptySubtitle}>
-          {"Paste a link to any recipe website\nto extract its ingredients"}
+          {"Paste a link to any recipe website\nor video to get started"}
         </Text>
         <TouchableOpacity
           style={styles.emptyButton}
           onPress={() => router.push("/add-recipe")}
+          activeOpacity={0.8}
           testID="empty-add-recipe"
         >
           <Plus size={18} color={Colors.textOnPrimary} />
@@ -118,15 +123,20 @@ export default function RecipesScreen() {
     <View style={styles.container}>
       <Stack.Screen
         options={{
-          title: "Chase",
+          title: "My Recipes",
+          headerStyle: { backgroundColor: Colors.background },
+          headerTitleStyle: { fontWeight: "700" as const, color: Colors.text, fontSize: 18 },
           headerRight: () =>
             recipes.length > 0 ? (
               <TouchableOpacity
                 onPress={() => router.push("/add-recipe")}
                 style={styles.headerButton}
+                activeOpacity={0.7}
                 testID="add-recipe-button"
               >
-                <Plus size={22} color={Colors.primary} />
+                <View style={styles.headerAddButton}>
+                  <Plus size={18} color={Colors.textOnPrimary} />
+                </View>
               </TouchableOpacity>
             ) : null,
         }}
@@ -165,8 +175,15 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   headerButton: {
-    padding: 4,
     marginRight: 4,
+  },
+  headerAddButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: Colors.primary,
+    justifyContent: "center",
+    alignItems: "center",
   },
   listContent: {
     padding: 16,
@@ -177,7 +194,7 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: Colors.surface,
-    borderRadius: 16,
+    borderRadius: 18,
     marginBottom: 16,
     overflow: "hidden",
     borderWidth: 1,
@@ -187,15 +204,34 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 180,
   },
+  cardOverlay: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+  },
+  timeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(44, 24, 16, 0.6)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  timeBadgeText: {
+    fontSize: 11,
+    color: "#FFFFFF",
+    fontWeight: "600" as const,
+  },
   cardContent: {
     padding: 16,
   },
   cardTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: "700" as const,
     color: Colors.text,
     marginBottom: 8,
-    lineHeight: 24,
+    lineHeight: 23,
   },
   cardMeta: {
     flexDirection: "row",
@@ -206,6 +242,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
+    flex: 1,
   },
   metaText: {
     fontSize: 12,
@@ -217,15 +254,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   ingredientBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     backgroundColor: Colors.surfaceAlt,
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 20,
   },
   ingredientCount: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: Colors.primary,
     fontWeight: "600" as const,
+  },
+  deleteButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: Colors.surfaceAlt,
+    justifyContent: "center",
+    alignItems: "center",
   },
   emptyContainer: {
     flex: 1,
@@ -263,15 +311,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600" as const,
   },
-  bookIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+  potIcon: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     backgroundColor: Colors.surfaceAlt,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 2,
+    borderColor: Colors.cardBorder,
   },
-  bookIconText: {
-    fontSize: 36,
+  potIconText: {
+    fontSize: 40,
   },
 });

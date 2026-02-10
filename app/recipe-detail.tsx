@@ -1,9 +1,11 @@
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import {
-  ShoppingCart,
+  ShoppingBasket,
   Check,
   ExternalLink,
+  ChevronLeft,
+  UtensilsCrossed,
 } from "lucide-react-native";
 import React, { useMemo, useCallback } from "react";
 import {
@@ -22,6 +24,7 @@ import { Ingredient } from "@/types";
 
 const CATEGORY_LABELS: Record<string, string> = {
   produce: "🥬 Produce",
+  fruits_vegetables: "🍎 Fruits & Vegetables",
   dairy: "🥛 Dairy & Eggs",
   meat: "🥩 Meat",
   seafood: "🐟 Seafood",
@@ -80,7 +83,11 @@ export default function RecipeDetailScreen() {
       <View style={styles.notFound}>
         <Stack.Screen options={{ title: "Not Found" }} />
         <Text style={styles.notFoundText}>Recipe not found</Text>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.notFoundButton}
+        >
+          <ChevronLeft size={18} color={Colors.primary} />
           <Text style={styles.notFoundLink}>Go back</Text>
         </TouchableOpacity>
       </View>
@@ -91,8 +98,10 @@ export default function RecipeDetailScreen() {
     <View style={styles.container}>
       <Stack.Screen
         options={{
-          title: recipe.title,
+          title: "",
           headerBackTitle: "Recipes",
+          headerStyle: { backgroundColor: Colors.background },
+          headerTintColor: Colors.primary,
         }}
       />
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -108,6 +117,7 @@ export default function RecipeDetailScreen() {
           <TouchableOpacity
             style={styles.sourceButton}
             onPress={() => Linking.openURL(recipe.url)}
+            activeOpacity={0.7}
           >
             <ExternalLink size={14} color={Colors.primary} />
             <Text style={styles.sourceText}>{recipe.source}</Text>
@@ -115,17 +125,20 @@ export default function RecipeDetailScreen() {
 
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
+              <UtensilsCrossed size={16} color={Colors.text} />
               <Text style={styles.statNumber}>{recipe.ingredients.length}</Text>
-              <Text style={styles.statLabel}>Ingredients</Text>
+              <Text style={styles.statLabel}>Total</Text>
             </View>
-            <View style={styles.statCard}>
+            <View style={[styles.statCard, styles.statCardSuccess]}>
+              <Check size={16} color={Colors.success} />
               <Text style={[styles.statNumber, { color: Colors.success }]}>
                 {recipe.ingredients.length - missingCount}
               </Text>
               <Text style={styles.statLabel}>In Pantry</Text>
             </View>
-            <View style={styles.statCard}>
-              <Text style={[styles.statNumber, { color: Colors.accent }]}>
+            <View style={[styles.statCard, styles.statCardWarning]}>
+              <ShoppingBasket size={16} color={Colors.primary} />
+              <Text style={[styles.statNumber, { color: Colors.primary }]}>
                 {missingCount}
               </Text>
               <Text style={styles.statLabel}>Missing</Text>
@@ -138,7 +151,7 @@ export default function RecipeDetailScreen() {
             activeOpacity={0.8}
             testID="generate-grocery-list"
           >
-            <ShoppingCart size={20} color={Colors.textOnPrimary} />
+            <ShoppingBasket size={20} color={Colors.textOnPrimary} />
             <Text style={styles.generateButtonText}>Generate Grocery List</Text>
           </TouchableOpacity>
 
@@ -167,7 +180,7 @@ export default function RecipeDetailScreen() {
                   <View
                     style={[
                       styles.statusDot,
-                      { backgroundColor: ing.inPantry ? Colors.inPantryText : Colors.accent },
+                      { backgroundColor: ing.inPantry ? Colors.inPantryText : Colors.primary },
                     ]}
                   />
                   <View style={styles.ingredientInfo}>
@@ -210,57 +223,70 @@ const styles = StyleSheet.create({
   },
   heroImage: {
     width: "100%",
-    height: 240,
+    height: 260,
   },
   content: {
     padding: 20,
     paddingBottom: 60,
   },
   title: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: "800" as const,
     color: Colors.text,
     marginBottom: 8,
-    lineHeight: 32,
+    lineHeight: 30,
   },
   sourceButton: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     marginBottom: 20,
+    backgroundColor: Colors.surfaceAlt,
+    alignSelf: "flex-start",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
   },
   sourceText: {
-    fontSize: 14,
+    fontSize: 13,
     color: Colors.primary,
     fontWeight: "500" as const,
   },
   statsRow: {
     flexDirection: "row",
-    gap: 12,
+    gap: 10,
     marginBottom: 20,
   },
   statCard: {
     flex: 1,
     backgroundColor: Colors.surface,
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 14,
     alignItems: "center",
     borderWidth: 1,
     borderColor: Colors.cardBorder,
+    gap: 4,
+  },
+  statCardSuccess: {
+    backgroundColor: Colors.inPantry,
+    borderColor: "rgba(58, 125, 74, 0.15)",
+  },
+  statCardWarning: {
+    backgroundColor: Colors.missing,
+    borderColor: "rgba(200, 75, 49, 0.15)",
   },
   statNumber: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "800" as const,
     color: Colors.text,
   },
   statLabel: {
     fontSize: 11,
     color: Colors.textSecondary,
-    marginTop: 2,
     fontWeight: "500" as const,
   },
   generateButton: {
-    backgroundColor: Colors.accent,
+    backgroundColor: Colors.primary,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -306,7 +332,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 12,
     paddingHorizontal: 14,
-    borderRadius: 10,
+    borderRadius: 12,
     marginBottom: 6,
     gap: 12,
   },
@@ -343,7 +369,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "rgba(46, 125, 50, 0.15)",
+    backgroundColor: "rgba(58, 125, 74, 0.15)",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
@@ -354,14 +380,14 @@ const styles = StyleSheet.create({
     fontWeight: "600" as const,
   },
   missingTag: {
-    backgroundColor: "rgba(231, 111, 81, 0.15)",
+    backgroundColor: "rgba(200, 75, 49, 0.15)",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
   },
   missingTagText: {
     fontSize: 11,
-    color: Colors.accent,
+    color: Colors.primary,
     fontWeight: "600" as const,
   },
   notFound: {
@@ -373,7 +399,16 @@ const styles = StyleSheet.create({
   notFoundText: {
     fontSize: 18,
     color: Colors.textSecondary,
-    marginBottom: 12,
+    marginBottom: 16,
+  },
+  notFoundButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: Colors.surfaceAlt,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
   },
   notFoundLink: {
     fontSize: 16,

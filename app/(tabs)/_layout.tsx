@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { BookOpen, ShoppingCart, Package } from "lucide-react-native";
+import { CookingPot, ShoppingBasket, Refrigerator } from "lucide-react-native";
 import React from "react";
 import { Platform } from "react-native";
 
@@ -28,21 +28,21 @@ export default function TabLayout() {
         name="(home)"
         options={{
           title: "Recipes",
-          tabBarIcon: ({ color, size }) => <BookOpen size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <CookingPot size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="groceries"
         options={{
           title: "Groceries",
-          tabBarIcon: ({ color, size }) => <ShoppingCart size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <ShoppingBasket size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="pantry"
         options={{
           title: "Pantry",
-          tabBarIcon: ({ color, size }) => <Package size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <Refrigerator size={size} color={color} />,
         }}
       />
     </Tabs>

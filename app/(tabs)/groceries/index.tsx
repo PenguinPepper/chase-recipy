@@ -1,5 +1,5 @@
 import { useRouter, Stack } from "expo-router";
-import { Check, Trash2 } from "lucide-react-native";
+import { Check, Trash2, ShoppingBasket } from "lucide-react-native";
 import React, { useCallback } from "react";
 import {
   View,
@@ -74,8 +74,9 @@ export default function GroceriesScreen() {
             <TouchableOpacity
               onPress={() => handleDeleteList(list)}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={styles.deleteBtn}
             >
-              <Trash2 size={18} color={Colors.textTertiary} />
+              <Trash2 size={16} color={Colors.textTertiary} />
             </TouchableOpacity>
           </View>
 
@@ -139,7 +140,7 @@ export default function GroceriesScreen() {
     () => (
       <View style={styles.emptyContainer}>
         <View style={styles.emptyIconWrap}>
-          <Text style={{ fontSize: 36 }}>🛒</Text>
+          <ShoppingBasket size={36} color={Colors.primary} />
         </View>
         <Text style={styles.emptyTitle}>No grocery lists</Text>
         <Text style={styles.emptySubtitle}>
@@ -148,6 +149,7 @@ export default function GroceriesScreen() {
         <TouchableOpacity
           style={styles.emptyButton}
           onPress={() => router.push("/")}
+          activeOpacity={0.8}
         >
           <Text style={styles.emptyButtonText}>Browse Recipes</Text>
         </TouchableOpacity>
@@ -158,7 +160,13 @@ export default function GroceriesScreen() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ title: "Grocery Lists" }} />
+      <Stack.Screen
+        options={{
+          title: "Grocery Lists",
+          headerStyle: { backgroundColor: Colors.background },
+          headerTitleStyle: { fontWeight: "700" as const, color: Colors.text, fontSize: 18 },
+        }}
+      />
       <FlatList
         data={groceryLists}
         keyExtractor={(item) => item.id}
@@ -188,7 +196,7 @@ const styles = StyleSheet.create({
   },
   listCard: {
     backgroundColor: Colors.surface,
-    borderRadius: 16,
+    borderRadius: 18,
     marginBottom: 16,
     overflow: "hidden",
     borderWidth: 1,
@@ -214,6 +222,14 @@ const styles = StyleSheet.create({
   listSubtitle: {
     fontSize: 13,
     color: Colors.textSecondary,
+  },
+  deleteBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: Colors.surfaceAlt,
+    justifyContent: "center",
+    alignItems: "center",
   },
   progressBarContainer: {
     height: 4,
@@ -251,9 +267,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceAlt,
   },
   checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
+    width: 24,
+    height: 24,
+    borderRadius: 7,
     borderWidth: 2,
     borderColor: Colors.cardBorder,
     justifyContent: "center",
@@ -298,13 +314,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   emptyIconWrap: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     backgroundColor: Colors.surfaceAlt,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 20,
+    borderWidth: 2,
+    borderColor: Colors.cardBorder,
   },
   emptyTitle: {
     fontSize: 22,

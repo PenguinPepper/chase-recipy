@@ -9,12 +9,14 @@ import {
   Plus,
   Trash2,
   ChevronRight,
+  ChevronLeft,
   Edit3,
   CheckCircle2,
   Video,
   FileText,
   Clock,
   AlertCircle,
+  CookingPot,
 } from "lucide-react-native";
 import React, { useState, useRef, useCallback } from "react";
 import {
@@ -219,6 +221,19 @@ export default function AddRecipeScreen() {
     setStep("details");
   }, []);
 
+  const handleBack = useCallback(() => {
+    if (step === "details") {
+      Alert.alert("Discard?", "You\u2019ll lose your changes.", [
+        { text: "Cancel", style: "cancel" },
+        { text: "Discard", style: "destructive", onPress: () => router.back() },
+      ]);
+    } else if (step === "transcript") {
+      setStep("details");
+    } else {
+      router.back();
+    }
+  }, [step, router]);
+
   const spin = spinAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ["0deg", "360deg"],
@@ -231,7 +246,7 @@ export default function AddRecipeScreen() {
     >
       <View style={styles.heroSection}>
         <View style={styles.heroIcon}>
-          <Text style={{ fontSize: 48 }}>🔗</Text>
+          <CookingPot size={40} color={Colors.primary} />
         </View>
         <Text style={styles.heroTitle}>Save a Recipe</Text>
         <Text style={styles.heroSubtitle}>
@@ -593,7 +608,7 @@ export default function AddRecipeScreen() {
           activeOpacity={0.8}
           testID="save-recipe"
         >
-          <ChevronRight size={20} color={Colors.textOnPrimary} />
+          <CheckCircle2 size={20} color={Colors.textOnPrimary} />
           <Text style={styles.saveButtonText}>Save Recipe</Text>
         </TouchableOpacity>
       </View>
@@ -609,23 +624,22 @@ export default function AddRecipeScreen() {
         options={{
           title: step === "url" ? "Add Recipe" : step === "transcript" ? "Video Transcript" : "Recipe Details",
           presentation: "modal",
+          headerStyle: { backgroundColor: Colors.background },
+          headerTitleStyle: { fontWeight: "700" as const, color: Colors.text },
           headerLeft: () => (
             <TouchableOpacity
-              onPress={() => {
-                if (step === "details") {
-                  Alert.alert("Discard?", "You\u2019ll lose your changes.", [
-                    { text: "Cancel", style: "cancel" },
-                    { text: "Discard", style: "destructive", onPress: () => router.back() },
-                  ]);
-                } else if (step === "transcript") {
-                  setStep("details");
-                } else {
-                  router.back();
-                }
-              }}
+              onPress={handleBack}
+              style={styles.headerBackButton}
               testID="close-modal"
             >
-              <X size={22} color={Colors.text} />
+              {step === "url" ? (
+                <X size={22} color={Colors.text} />
+              ) : (
+                <View style={styles.backRow}>
+                  <ChevronLeft size={22} color={Colors.primary} />
+                  <Text style={styles.backText}>Back</Text>
+                </View>
+              )}
             </TouchableOpacity>
           ),
           headerRight: () =>
@@ -658,6 +672,19 @@ const styles = StyleSheet.create({
     fontWeight: "700" as const,
     color: Colors.primary,
   },
+  headerBackButton: {
+    paddingVertical: 4,
+  },
+  backRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  backText: {
+    fontSize: 16,
+    color: Colors.primary,
+    fontWeight: "500" as const,
+    marginLeft: -2,
+  },
   heroSection: {
     alignItems: "center",
     marginBottom: 32,
@@ -670,6 +697,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 20,
+    borderWidth: 2,
+    borderColor: Colors.cardBorder,
   },
   heroTitle: {
     fontSize: 24,

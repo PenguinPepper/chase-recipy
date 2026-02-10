@@ -1,5 +1,5 @@
 import { Stack } from "expo-router";
-import { Plus, Trash2, Search, ChevronDown } from "lucide-react-native";
+import { Plus, Trash2, Search, ChevronDown, Refrigerator } from "lucide-react-native";
 import React, { useState, useCallback, useMemo } from "react";
 import {
   View,
@@ -97,15 +97,20 @@ export default function PantryScreen() {
     <View style={styles.container}>
       <Stack.Screen
         options={{
-          title: "Pantry",
+          title: "My Pantry",
+          headerStyle: { backgroundColor: Colors.background },
+          headerTitleStyle: { fontWeight: "700" as const, color: Colors.text, fontSize: 18 },
           headerRight: () =>
             pantryItems.length > 0 ? (
               <TouchableOpacity
                 onPress={() => setShowAddModal(true)}
                 style={styles.headerButton}
+                activeOpacity={0.7}
                 testID="add-pantry-button"
               >
-                <Plus size={22} color={Colors.primary} />
+                <View style={styles.headerAddButton}>
+                  <Plus size={18} color={Colors.textOnPrimary} />
+                </View>
               </TouchableOpacity>
             ) : null,
         }}
@@ -143,9 +148,10 @@ export default function PantryScreen() {
                   <TouchableOpacity
                     onPress={() => handleRemoveItem(pantryItem)}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    style={styles.removeBtn}
                     testID={`remove-pantry-${pantryItem.id}`}
                   >
-                    <Trash2 size={16} color={Colors.textTertiary} />
+                    <Trash2 size={14} color={Colors.textTertiary} />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -166,7 +172,7 @@ export default function PantryScreen() {
       ) : (
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIconWrap}>
-            <Text style={{ fontSize: 36 }}>📦</Text>
+            <Refrigerator size={36} color={Colors.primary} />
           </View>
           <Text style={styles.emptyTitle}>Your pantry is empty</Text>
           <Text style={styles.emptySubtitle}>
@@ -175,6 +181,7 @@ export default function PantryScreen() {
           <TouchableOpacity
             style={styles.emptyButton}
             onPress={() => setShowAddModal(true)}
+            activeOpacity={0.8}
             testID="empty-add-pantry"
           >
             <Plus size={18} color={Colors.textOnPrimary} />
@@ -266,8 +273,15 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   headerButton: {
-    padding: 4,
     marginRight: 4,
+  },
+  headerAddButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: Colors.primary,
+    justifyContent: "center",
+    alignItems: "center",
   },
   searchContainer: {
     flexDirection: "row",
@@ -311,7 +325,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     paddingVertical: 12,
     paddingHorizontal: 14,
-    borderRadius: 10,
+    borderRadius: 12,
     marginBottom: 6,
     borderWidth: 1,
     borderColor: Colors.cardBorder,
@@ -329,6 +343,14 @@ const styles = StyleSheet.create({
     fontWeight: "500" as const,
     color: Colors.text,
   },
+  removeBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: Colors.surfaceAlt,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   emptyContainer: {
     flex: 1,
     justifyContent: "center",
@@ -336,13 +358,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   emptyIconWrap: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     backgroundColor: Colors.surfaceAlt,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 20,
+    borderWidth: 2,
+    borderColor: Colors.cardBorder,
   },
   emptyTitle: {
     fontSize: 22,

@@ -13,7 +13,14 @@ const queryClient = new QueryClient();
 
 function RootLayoutNav() {
   return (
-    <Stack screenOptions={{ headerBackTitle: "Back" }}>
+    <Stack
+      screenOptions={{
+        headerBackTitle: "Back",
+        headerStyle: { backgroundColor: Colors.background },
+        headerTintColor: Colors.primary,
+        headerTitleStyle: { fontWeight: "700" as const, color: Colors.text },
+      }}
+    >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen
         name="add-recipe"
@@ -26,8 +33,8 @@ function RootLayoutNav() {
         name="recipe-detail"
         options={{
           headerStyle: { backgroundColor: Colors.background },
-          headerTintColor: Colors.text,
-          headerTitleStyle: { fontWeight: "700" as const },
+          headerTintColor: Colors.primary,
+          headerTitleStyle: { fontWeight: "700" as const, color: Colors.text },
         }}
       />
     </Stack>
