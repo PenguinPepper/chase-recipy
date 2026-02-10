@@ -3,6 +3,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 import { Recipe, GroceryList, GroceryItem, PantryItem, Ingredient } from "@/types";
 
 const RECIPES_KEY = "chase_recipes";
@@ -13,34 +15,111 @@ function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
 }
 
+async function loadFromSupabase<T>(userId: string, dataKey: string): Promise<T | null> {
+  try {
+    console.log(`[Chase] Loading ${dataKey} from Supabase for user ${userId}`);
+    const { data, error } = await supabase
+      .from("user_data")
+      .select("data_value")
+      .eq("user_id", userId)
+      .eq("data_key", dataKey)
+      .maybeSingle();
+
+    if (error) {
+      console.log(`[Chase] Supabase load error for ${dataKey}:`, error.message);
+      return null;
+    }
+    if (data?.data_value) {
+      console.log(`[Chase] Loaded ${dataKey} from Supabase`);
+      return data.data_value as T;
+    }
+    return null;
+  } catch (e) {
+    console.log(`[Chase] Supabase load exception for ${dataKey}:`, e);
+    return null;
+  }
+}
+
+async function saveToSupabase(userId: string, dataKey: string, value: unknown): Promise<void> {
+  try {
+    console.log(`[Chase] Saving ${dataKey} to Supabase for user ${userId}`);
+    const { error } = await supabase
+      .from("user_data")
+      .upsert(
+        {
+          user_id: userId,
+          data_key: dataKey,
+          data_value: value,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id,data_key" }
+      );
+
+    if (error) {
+      console.log(`[Chase] Supabase save error for ${dataKey}:`, error.message);
+    } else {
+      console.log(`[Chase] Saved ${dataKey} to Supabase`);
+    }
+  } catch (e) {
+    console.log(`[Chase] Supabase save exception for ${dataKey}:`, e);
+  }
+}
+
 export const [ChaseProvider, useChase] = createContextHook(() => {
   const queryClient = useQueryClient();
+  const { user, isAuthenticated } = useAuth();
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [groceryLists, setGroceryLists] = useState<GroceryList[]>([]);
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
 
+  const userId = user?.id;
+
   const recipesQuery = useQuery({
-    queryKey: ["recipes"],
+    queryKey: ["recipes", userId],
     queryFn: async () => {
+      if (userId) {
+        const remote = await loadFromSupabase<Recipe[]>(userId, "recipes");
+        if (remote) {
+          await AsyncStorage.setItem(RECIPES_KEY, JSON.stringify(remote));
+          return remote;
+        }
+      }
       const stored = await AsyncStorage.getItem(RECIPES_KEY);
       return stored ? (JSON.parse(stored) as Recipe[]) : [];
     },
+    enabled: !!(isAuthenticated && userId),
   });
 
   const groceryQuery = useQuery({
-    queryKey: ["groceryLists"],
+    queryKey: ["groceryLists", userId],
     queryFn: async () => {
+      if (userId) {
+        const remote = await loadFromSupabase<GroceryList[]>(userId, "grocery_lists");
+        if (remote) {
+          await AsyncStorage.setItem(GROCERY_LISTS_KEY, JSON.stringify(remote));
+          return remote;
+        }
+      }
       const stored = await AsyncStorage.getItem(GROCERY_LISTS_KEY);
       return stored ? (JSON.parse(stored) as GroceryList[]) : [];
     },
+    enabled: !!(isAuthenticated && userId),
   });
 
   const pantryQuery = useQuery({
-    queryKey: ["pantry"],
+    queryKey: ["pantry", userId],
     queryFn: async () => {
+      if (userId) {
+        const remote = await loadFromSupabase<PantryItem[]>(userId, "pantry_items");
+        if (remote) {
+          await AsyncStorage.setItem(PANTRY_KEY, JSON.stringify(remote));
+          return remote;
+        }
+      }
       const stored = await AsyncStorage.getItem(PANTRY_KEY);
       return stored ? (JSON.parse(stored) as PantryItem[]) : [];
     },
+    enabled: !!(isAuthenticated && userId),
   });
 
   useEffect(() => {
@@ -55,28 +134,43 @@ export const [ChaseProvider, useChase] = createContextHook(() => {
     if (pantryQuery.data) setPantryItems(pantryQuery.data);
   }, [pantryQuery.data]);
 
-  const { mutate: saveRecipes } = useMutation({
-    mutationFn: async (updated: Recipe[]) => {
+  const persistRecipes = useCallback(
+    async (updated: Recipe[]) => {
       await AsyncStorage.setItem(RECIPES_KEY, JSON.stringify(updated));
-      return updated;
+      if (userId) await saveToSupabase(userId, "recipes", updated);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["recipes"] }),
+    [userId]
+  );
+
+  const persistGrocery = useCallback(
+    async (updated: GroceryList[]) => {
+      await AsyncStorage.setItem(GROCERY_LISTS_KEY, JSON.stringify(updated));
+      if (userId) await saveToSupabase(userId, "grocery_lists", updated);
+    },
+    [userId]
+  );
+
+  const persistPantry = useCallback(
+    async (updated: PantryItem[]) => {
+      await AsyncStorage.setItem(PANTRY_KEY, JSON.stringify(updated));
+      if (userId) await saveToSupabase(userId, "pantry_items", updated);
+    },
+    [userId]
+  );
+
+  const { mutate: saveRecipes } = useMutation({
+    mutationFn: persistRecipes,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["recipes", userId] }),
   });
 
   const { mutate: saveGrocery } = useMutation({
-    mutationFn: async (updated: GroceryList[]) => {
-      await AsyncStorage.setItem(GROCERY_LISTS_KEY, JSON.stringify(updated));
-      return updated;
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["groceryLists"] }),
+    mutationFn: persistGrocery,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["groceryLists", userId] }),
   });
 
   const { mutate: savePantry } = useMutation({
-    mutationFn: async (updated: PantryItem[]) => {
-      await AsyncStorage.setItem(PANTRY_KEY, JSON.stringify(updated));
-      return updated;
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pantry"] }),
+    mutationFn: persistPantry,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pantry", userId] }),
   });
 
   const addRecipe = useCallback(

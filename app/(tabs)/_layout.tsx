@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { CookingPot, ShoppingBasket, Refrigerator } from "lucide-react-native";
+import { CookingPot, ShoppingBasket, Refrigerator, UserRound } from "lucide-react-native";
 import React from "react";
 import { Platform } from "react-native";
 
@@ -43,6 +43,13 @@ export default function TabLayout() {
         options={{
           title: "Pantry",
           tabBarIcon: ({ color, size }) => <Refrigerator size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "Profile",
+          tabBarIcon: ({ color, size }) => <UserRound size={size} color={color} />,
         }}
       />
     </Tabs>
