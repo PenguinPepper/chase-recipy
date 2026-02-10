@@ -666,6 +666,79 @@ interface AssemblyAITranscriptResponse {
   error?: string;
 }
 
+interface CobaltResponse {
+  status: "tunnel" | "redirect" | "picker" | "error";
+  url?: string;
+  filename?: string;
+  error?: string;
+  picker?: { url: string; type: string }[];
+}
+
+const COBALT_API_INSTANCES = [
+  "https://api.cobalt.tools",
+  "https://cobalt-api.kwiatekmiki.com",
+];
+
+async function getAudioUrlViaCobalt(videoUrl: string): Promise<string | null> {
+  console.log("[Cobalt] Attempting to extract audio URL for:", videoUrl);
+
+  for (const instance of COBALT_API_INSTANCES) {
+    try {
+      console.log("[Cobalt] Trying instance:", instance);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+      const response = await fetch(instance, {
+        method: "POST",
+        headers: {
+          "Accept": "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          url: videoUrl,
+          downloadMode: "audio",
+          audioFormat: "mp3",
+          audioBitrate: "128",
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        console.log("[Cobalt] Instance responded with status:", response.status);
+        continue;
+      }
+
+      const data = (await response.json()) as CobaltResponse;
+      console.log("[Cobalt] Response status:", data.status);
+
+      if (data.status === "tunnel" || data.status === "redirect") {
+        if (data.url) {
+          console.log("[Cobalt] Got audio URL, length:", data.url.length);
+          return data.url;
+        }
+      }
+
+      if (data.status === "picker" && data.picker && data.picker.length > 0) {
+        const audioItem = data.picker.find((p) => p.type === "audio") ?? data.picker[0];
+        if (audioItem?.url) {
+          console.log("[Cobalt] Got audio URL from picker");
+          return audioItem.url;
+        }
+      }
+
+      if (data.status === "error") {
+        console.log("[Cobalt] Error from instance:", data.error);
+      }
+    } catch (err) {
+      console.log("[Cobalt] Instance failed:", instance, err);
+    }
+  }
+
+  console.log("[Cobalt] All instances failed, no audio URL obtained");
+  return null;
+}
+
 async function transcribeWithAssemblyAI(videoUrl: string): Promise<TranscriptSegment[]> {
   if (!ASSEMBLYAI_API_KEY) {
     console.log("[AssemblyAI] No API key configured, skipping");
@@ -777,13 +850,6 @@ async function transcribeWithAssemblyAI(videoUrl: string): Promise<TranscriptSeg
   }
 }
 
-function getDirectVideoUrl(url: string, platform: "youtube" | "instagram" | "unknown", videoId: string): string {
-  if (platform === "youtube") {
-    return `https://www.youtube.com/watch?v=${videoId}`;
-  }
-  return url;
-}
-
 export async function extractVideoRecipe(url: string): Promise<VideoRecipeResult> {
   console.log("[VideoExtractor] Starting extraction for:", url);
 
@@ -823,13 +889,23 @@ export async function extractVideoRecipe(url: string): Promise<VideoRecipeResult
   let fullText = transcript.map((s) => s.text).join(" ");
 
   if (transcript.length === 0) {
-    console.log("[VideoExtractor] No YouTube captions found, trying AssemblyAI...");
-    const directUrl = getDirectVideoUrl(url, platform, videoId);
-    transcript = await transcribeWithAssemblyAI(directUrl);
-    fullText = transcript.map((s) => s.text).join(" ");
+    console.log("[VideoExtractor] No YouTube captions found, trying Cobalt + AssemblyAI...");
 
-    if (transcript.length > 0) {
-      console.log("[VideoExtractor] AssemblyAI fallback succeeded with", transcript.length, "segments");
+    const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    const audioUrl = await getAudioUrlViaCobalt(youtubeUrl);
+
+    if (audioUrl) {
+      console.log("[VideoExtractor] Got audio URL via Cobalt, sending to AssemblyAI...");
+      transcript = await transcribeWithAssemblyAI(audioUrl);
+      fullText = transcript.map((s) => s.text).join(" ");
+
+      if (transcript.length > 0) {
+        console.log("[VideoExtractor] Cobalt + AssemblyAI succeeded with", transcript.length, "segments");
+      }
+    } else {
+      console.log("[VideoExtractor] Cobalt failed, trying AssemblyAI with direct URL as last resort...");
+      transcript = await transcribeWithAssemblyAI(youtubeUrl);
+      fullText = transcript.map((s) => s.text).join(" ");
     }
   }
 
