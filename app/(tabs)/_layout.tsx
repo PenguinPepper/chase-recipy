@@ -32,14 +32,14 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="(groceries)"
+        name="groceries"
         options={{
           title: "Groceries",
           tabBarIcon: ({ color, size }) => <ShoppingCart size={size} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="(pantry)"
+        name="pantry"
         options={{
           title: "Pantry",
           tabBarIcon: ({ color, size }) => <Package size={size} color={color} />,
