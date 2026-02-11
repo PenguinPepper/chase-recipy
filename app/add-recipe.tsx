@@ -486,10 +486,12 @@ export default function AddRecipeScreen() {
           <View style={styles.transcriptContainer}>
             {transcript.map((seg, idx) => (
               <View key={idx} style={styles.transcriptLine}>
-                <Text style={styles.transcriptTimestamp}>
-                  <Clock size={10} color={Colors.textTertiary} />{" "}
-                  {formatTimestamp(seg.start)}
-                </Text>
+                <View style={styles.transcriptTimestampRow}>
+                  <Clock size={10} color={Colors.textTertiary} />
+                  <Text style={styles.transcriptTimestamp}>
+                    {formatTimestamp(seg.start)}
+                  </Text>
+                </View>
                 <Text style={styles.transcriptText}>{seg.text}</Text>
               </View>
             ))}
@@ -1101,12 +1103,17 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     alignItems: "flex-start",
   },
+  transcriptTimestampRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 3,
+    minWidth: 50,
+    marginTop: 2,
+  },
   transcriptTimestamp: {
     fontSize: 11,
     color: Colors.textTertiary,
     fontWeight: "600" as const,
-    minWidth: 40,
-    marginTop: 2,
   },
   transcriptText: {
     fontSize: 13,
