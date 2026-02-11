@@ -6,6 +6,8 @@ import {
   ExternalLink,
   ChevronLeft,
   UtensilsCrossed,
+  Globe,
+  Lock,
 } from "lucide-react-native";
 import React, { useMemo, useCallback } from "react";
 import {
@@ -39,7 +41,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 export default function RecipeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { recipes, checkRecipeAgainstPantry, generateGroceryList } = useChase();
+  const { recipes, checkRecipeAgainstPantry, generateGroceryList, toggleRecipePublic } = useChase();
 
   const recipe = useMemo(
     () => recipes.find((r) => r.id === id),
@@ -145,15 +147,41 @@ export default function RecipeDetailScreen() {
             </View>
           </View>
 
-          <TouchableOpacity
-            style={styles.generateButton}
-            onPress={handleGenerateGroceryList}
-            activeOpacity={0.8}
-            testID="generate-grocery-list"
-          >
-            <ShoppingBasket size={20} color={Colors.textOnPrimary} />
-            <Text style={styles.generateButtonText}>Generate Grocery List</Text>
-          </TouchableOpacity>
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={styles.generateButton}
+              onPress={handleGenerateGroceryList}
+              activeOpacity={0.8}
+              testID="generate-grocery-list"
+            >
+              <ShoppingBasket size={20} color={Colors.textOnPrimary} />
+              <Text style={styles.generateButtonText}>Generate Grocery List</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.visibilityToggle,
+                recipe.isPublic ? styles.visibilityTogglePublic : styles.visibilityTogglePrivate,
+              ]}
+              onPress={() => toggleRecipePublic(recipe.id)}
+              activeOpacity={0.7}
+              testID="toggle-public"
+            >
+              {recipe.isPublic ? (
+                <Globe size={16} color={Colors.success} />
+              ) : (
+                <Lock size={16} color={Colors.textSecondary} />
+              )}
+              <Text
+                style={[
+                  styles.visibilityToggleText,
+                  recipe.isPublic ? styles.visibilityToggleTextPublic : null,
+                ]}
+              >
+                {recipe.isPublic ? "Public" : "Private"}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
           <Text style={styles.sectionTitle}>Ingredients</Text>
           {missingCount > 0 && (
@@ -285,6 +313,10 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontWeight: "500" as const,
   },
+  actionRow: {
+    gap: 10,
+    marginBottom: 28,
+  },
   generateButton: {
     backgroundColor: Colors.primary,
     flexDirection: "row",
@@ -293,12 +325,36 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 16,
     borderRadius: 14,
-    marginBottom: 28,
   },
   generateButtonText: {
     color: Colors.textOnPrimary,
     fontSize: 16,
     fontWeight: "700" as const,
+  },
+  visibilityToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+  },
+  visibilityTogglePublic: {
+    backgroundColor: Colors.inPantry,
+    borderColor: "rgba(58, 125, 74, 0.2)",
+  },
+  visibilityTogglePrivate: {
+    backgroundColor: Colors.surface,
+    borderColor: Colors.cardBorder,
+  },
+  visibilityToggleText: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    color: Colors.textSecondary,
+  },
+  visibilityToggleTextPublic: {
+    color: Colors.success,
   },
   sectionTitle: {
     fontSize: 20,

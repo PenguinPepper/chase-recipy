@@ -1,6 +1,6 @@
 import { Image } from "expo-image";
 import { useRouter, Stack } from "expo-router";
-import { Plus, Link2, Clock, Trash2, UtensilsCrossed } from "lucide-react-native";
+import { Plus, Link2, Clock, Trash2, UtensilsCrossed, Globe, Lock } from "lucide-react-native";
 import React, { useCallback } from "react";
 import {
   View,
@@ -55,9 +55,17 @@ export default function RecipesScreen() {
             contentFit="cover"
           />
           <View style={styles.cardOverlay}>
-            <View style={styles.timeBadge}>
-              <Clock size={10} color="#FFFFFF" />
-              <Text style={styles.timeBadgeText}>{timeAgo}</Text>
+            <View style={styles.overlayRow}>
+              {item.isPublic && (
+                <View style={styles.publicBadge}>
+                  <Globe size={10} color="#FFFFFF" />
+                  <Text style={styles.publicBadgeText}>Public</Text>
+                </View>
+              )}
+              <View style={styles.timeBadge}>
+                <Clock size={10} color="#FFFFFF" />
+                <Text style={styles.timeBadgeText}>{timeAgo}</Text>
+              </View>
             </View>
           </View>
           <View style={styles.cardContent}>
@@ -208,6 +216,24 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 12,
     right: 12,
+  },
+  overlayRow: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  publicBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(74, 140, 92, 0.85)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  publicBadgeText: {
+    fontSize: 11,
+    color: "#FFFFFF",
+    fontWeight: "600" as const,
   },
   timeBadge: {
     flexDirection: "row",

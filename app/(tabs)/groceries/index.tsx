@@ -1,5 +1,6 @@
+import { useMutation } from "@tanstack/react-query";
 import { useRouter, Stack } from "expo-router";
-import { Check, Trash2, ShoppingBasket } from "lucide-react-native";
+import { Check, Trash2, ShoppingBasket, Share2, Copy, Download } from "lucide-react-native";
 import React, { useCallback } from "react";
 import {
   View,
@@ -7,11 +8,14 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  TextInput,
   Alert,
+  Platform,
 } from "react-native";
 
 import Colors from "@/constants/colors";
 import { useChase } from "@/contexts/ChaseContext";
+import { getSharedGroceryList } from "@/lib/sharedGrocery";
 import { GroceryList, GroceryItem } from "@/types";
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -29,8 +33,59 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 export default function GroceriesScreen() {
-  const { groceryLists, toggleGroceryItem, deleteGroceryList } = useChase();
+  const { groceryLists, toggleGroceryItem, deleteGroceryList, shareList, importSharedList } = useChase();
   const router = useRouter();
+  const [shareCodeInput, setShareCodeInput] = React.useState<string>("");
+  const [showImport, setShowImport] = React.useState<boolean>(false);
+
+  const { mutate: doShare, isPending: isSharing } = useMutation({
+    mutationFn: async (listId: string) => {
+      return shareList(listId);
+    },
+    onSuccess: (code) => {
+      Alert.alert(
+        "List Shared!",
+        `Share code: ${code}\n\nAnyone can import this grocery list using this code.`,
+        [
+          {
+            text: "Copy Code",
+            onPress: () => {
+              try {
+                const Clipboard = require("expo-clipboard");
+                Clipboard.setStringAsync(code);
+              } catch {
+                console.log("[Grocery] Clipboard not available");
+              }
+            },
+          },
+          { text: "OK" },
+        ]
+      );
+    },
+    onError: (err: Error) => {
+      Alert.alert("Share Failed", err.message);
+    },
+  });
+
+  const { mutate: doImport, isPending: isImporting } = useMutation({
+    mutationFn: async (code: string) => {
+      const shared = await getSharedGroceryList(code);
+      if (!shared) throw new Error("No list found with that code");
+      return shared;
+    },
+    onSuccess: (shared) => {
+      importSharedList({
+        recipeTitle: shared.recipe_title,
+        items: shared.items,
+      });
+      setShareCodeInput("");
+      setShowImport(false);
+      Alert.alert("Imported!", `Grocery list for "${shared.recipe_title}" has been added.`);
+    },
+    onError: (err: Error) => {
+      Alert.alert("Import Failed", err.message);
+    },
+  });
 
   const handleDeleteList = useCallback(
     (list: GroceryList) => {
@@ -70,14 +125,29 @@ export default function GroceriesScreen() {
                 {checkedCount}/{total} items checked
                 {inPantryCount > 0 ? ` · ${inPantryCount} in pantry` : ""}
               </Text>
+              {list.shareCode && (
+                <View style={styles.shareCodeBadge}>
+                  <Share2 size={10} color={Colors.success} />
+                  <Text style={styles.shareCodeText}>Code: {list.shareCode}</Text>
+                </View>
+              )}
             </View>
-            <TouchableOpacity
-              onPress={() => handleDeleteList(list)}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              style={styles.deleteBtn}
-            >
-              <Trash2 size={16} color={Colors.textTertiary} />
-            </TouchableOpacity>
+            <View style={styles.listActions}>
+              <TouchableOpacity
+                onPress={() => doShare(list.id)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                style={styles.shareBtn}
+              >
+                <Share2 size={15} color={Colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleDeleteList(list)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                style={styles.deleteBtn}
+              >
+                <Trash2 size={16} color={Colors.textTertiary} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           <View style={styles.progressBarContainer}>
@@ -165,8 +235,57 @@ export default function GroceriesScreen() {
           title: "Grocery Lists",
           headerStyle: { backgroundColor: Colors.background },
           headerTitleStyle: { fontWeight: "700" as const, color: Colors.text, fontSize: 18 },
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() => setShowImport(!showImport)}
+              style={styles.headerImportBtn}
+              activeOpacity={0.7}
+            >
+              <Download size={18} color={Colors.primary} />
+            </TouchableOpacity>
+          ),
         }}
       />
+
+      {showImport && (
+        <View style={styles.importSection}>
+          <Text style={styles.importTitle}>Import Shared List</Text>
+          <View style={styles.importRow}>
+            <View style={styles.importInputContainer}>
+              <Copy size={16} color={Colors.textTertiary} />
+              <TextInput
+                style={styles.importInput}
+                placeholder="Enter share code..."
+                placeholderTextColor={Colors.textTertiary}
+                value={shareCodeInput}
+                onChangeText={setShareCodeInput}
+                autoCapitalize="characters"
+                maxLength={6}
+                returnKeyType="go"
+                onSubmitEditing={() => {
+                  if (shareCodeInput.trim()) doImport(shareCodeInput.trim());
+                }}
+                testID="import-code-input"
+              />
+            </View>
+            <TouchableOpacity
+              style={[
+                styles.importButton,
+                (!shareCodeInput.trim() || isImporting) && styles.importButtonDisabled,
+              ]}
+              onPress={() => doImport(shareCodeInput.trim())}
+              disabled={!shareCodeInput.trim() || isImporting}
+              activeOpacity={0.7}
+              testID="import-button"
+            >
+              <Text style={styles.importButtonText}>
+                {isImporting ? "..." : "Import"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
       <FlatList
         data={groceryLists}
         keyExtractor={(item) => item.id}
@@ -223,6 +342,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.textSecondary,
   },
+  listActions: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  shareBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: Colors.inPantry,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   deleteBtn: {
     width: 32,
     height: 32,
@@ -230,6 +361,71 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceAlt,
     justifyContent: "center",
     alignItems: "center",
+  },
+  shareCodeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 4,
+  },
+  shareCodeText: {
+    fontSize: 11,
+    color: Colors.success,
+    fontWeight: "600" as const,
+  },
+  headerImportBtn: {
+    marginRight: 4,
+  },
+  importSection: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: Colors.surfaceAlt,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.divider,
+  },
+  importTitle: {
+    fontSize: 14,
+    fontWeight: "700" as const,
+    color: Colors.text,
+    marginBottom: 8,
+  },
+  importRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  importInputContainer: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.surface,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+  },
+  importInput: {
+    flex: 1,
+    fontSize: 16,
+    color: Colors.text,
+    paddingVertical: 10,
+    letterSpacing: 2,
+    fontWeight: "700" as const,
+  },
+  importButton: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 18,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  importButtonDisabled: {
+    opacity: 0.5,
+  },
+  importButtonText: {
+    fontSize: 14,
+    fontWeight: "700" as const,
+    color: Colors.textOnPrimary,
   },
   progressBarContainer: {
     height: 4,

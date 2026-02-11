@@ -17,6 +17,9 @@ import {
   Clock,
   AlertCircle,
   CookingPot,
+  Globe,
+  Lock,
+  Database,
 } from "lucide-react-native";
 import React, { useState, useRef, useCallback } from "react";
 import {
@@ -34,7 +37,8 @@ import {
 
 import Colors from "@/constants/colors";
 import { useChase } from "@/contexts/ChaseContext";
-import { Ingredient } from "@/types";
+import { findPublicRecipeByUrl } from "@/lib/publicRecipes";
+import { Ingredient, PublicRecipe } from "@/types";
 import {
   extractRecipeMetadata,
   createIngredientFromText,
@@ -65,6 +69,8 @@ export default function AddRecipeScreen() {
   const [transcript, setTranscript] = useState<TranscriptSegment[]>([]);
   const [isVideoLink, setIsVideoLink] = useState<boolean>(false);
   const [transcriptExpanded, setTranscriptExpanded] = useState<boolean>(false);
+  const [isPublic, setIsPublic] = useState<boolean>(false);
+  const [foundExisting, setFoundExisting] = useState<PublicRecipe | null>(null);
   const spinAnim = useRef(new Animated.Value(0)).current;
   const ingredientInputRef = useRef<TextInput>(null);
 
@@ -160,7 +166,7 @@ export default function AddRecipeScreen() {
     ).start();
   }, [spinAnim]);
 
-  const handleFetchLink = useCallback(() => {
+  const handleFetchLink = useCallback(async () => {
     const trimmed = url.trim();
     if (!trimmed) {
       Alert.alert("Missing URL", "Please paste a recipe link.");
@@ -172,14 +178,55 @@ export default function AddRecipeScreen() {
       Alert.alert("Invalid URL", "Please enter a valid web address.");
       return;
     }
+
     startSpinning();
+
+    try {
+      const existing = await findPublicRecipeByUrl(trimmed.replace(/\/+$/, ""));
+      if (existing) {
+        console.log("[AddRecipe] Found existing public recipe:", existing.title);
+        setFoundExisting(existing);
+        Alert.alert(
+          "Recipe Already Exists",
+          `"${existing.title}" by ${existing.author_name} was already added. Use it?`,
+          [
+            {
+              text: "Use Existing",
+              onPress: () => {
+                setTitle(existing.title);
+                setImageUrl(existing.image_url);
+                setSource(existing.source);
+                setIngredients(existing.ingredients);
+                setIsVideoLink(false);
+                setStep("details");
+              },
+            },
+            {
+              text: "Extract Fresh",
+              onPress: () => {
+                setFoundExisting(null);
+                doExtraction(trimmed);
+              },
+            },
+          ]
+        );
+        return;
+      }
+    } catch (e) {
+      console.log("[AddRecipe] URL lookup failed, proceeding:", e);
+    }
+
+    doExtraction(trimmed);
+  }, [url, startSpinning]);
+
+  const doExtraction = useCallback((trimmed: string) => {
     if (isVideoUrl(trimmed)) {
       console.log("[AddRecipe] Detected video URL, using video extractor");
       fetchVideo(trimmed);
     } else {
       fetchMetadata(trimmed);
     }
-  }, [url, fetchMetadata, fetchVideo, startSpinning]);
+  }, [fetchMetadata, fetchVideo]);
 
   const handleAddIngredient = useCallback(() => {
     const text = newIngredientText.trim();
@@ -213,9 +260,10 @@ export default function AddRecipeScreen() {
       source,
       imageUrl: imageUrl || "https://images.unsplash.com/photo-1495521821757-a1efb6729352?w=800&q=80",
       ingredients,
+      isPublic,
     });
     router.back();
-  }, [title, url, source, imageUrl, ingredients, addRecipe, router]);
+  }, [title, url, source, imageUrl, ingredients, addRecipe, router, isPublic]);
 
   const handleContinueFromTranscript = useCallback(() => {
     setStep("details");
@@ -598,6 +646,46 @@ export default function AddRecipeScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        <View style={styles.visibilitySection}>
+          <Text style={styles.visibilityLabel}>Visibility</Text>
+          <View style={styles.visibilityRow}>
+            <TouchableOpacity
+              style={[styles.visibilityOption, !isPublic && styles.visibilityOptionActive]}
+              onPress={() => setIsPublic(false)}
+              activeOpacity={0.7}
+            >
+              <Lock size={16} color={!isPublic ? Colors.textOnPrimary : Colors.textSecondary} />
+              <Text style={[styles.visibilityOptionText, !isPublic && styles.visibilityOptionTextActive]}>
+                Private
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.visibilityOption, isPublic && styles.visibilityOptionActivePublic]}
+              onPress={() => setIsPublic(true)}
+              activeOpacity={0.7}
+            >
+              <Globe size={16} color={isPublic ? "#FFFFFF" : Colors.textSecondary} />
+              <Text style={[styles.visibilityOptionText, isPublic && styles.visibilityOptionTextActive]}>
+                Public
+              </Text>
+            </TouchableOpacity>
+          </View>
+          {isPublic && (
+            <Text style={styles.visibilityHint}>
+              Others can discover this recipe in Explore
+            </Text>
+          )}
+        </View>
+
+        {foundExisting && (
+          <View style={styles.existingBanner}>
+            <Database size={14} color={Colors.accent} />
+            <Text style={styles.existingBannerText}>
+              Pre-filled from community recipe by {foundExisting.author_name}
+            </Text>
+          </View>
+        )}
 
         <TouchableOpacity
           style={[
@@ -1160,5 +1248,69 @@ const styles = StyleSheet.create({
     color: Colors.textOnPrimary,
     fontSize: 16,
     fontWeight: "700" as const,
+  },
+  visibilitySection: {
+    marginBottom: 20,
+  },
+  visibilityLabel: {
+    fontSize: 16,
+    fontWeight: "700" as const,
+    color: Colors.text,
+    marginBottom: 10,
+  },
+  visibilityRow: {
+    flexDirection: "row" as const,
+    gap: 10,
+  },
+  visibilityOption: {
+    flex: 1,
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: Colors.surface,
+    borderWidth: 1.5,
+    borderColor: Colors.cardBorder,
+  },
+  visibilityOptionActive: {
+    backgroundColor: Colors.text,
+    borderColor: Colors.text,
+  },
+  visibilityOptionActivePublic: {
+    backgroundColor: Colors.success,
+    borderColor: Colors.success,
+  },
+  visibilityOptionText: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    color: Colors.textSecondary,
+  },
+  visibilityOptionTextActive: {
+    color: "#FFFFFF",
+  },
+  visibilityHint: {
+    fontSize: 12,
+    color: Colors.success,
+    marginTop: 6,
+    fontWeight: "500" as const,
+  },
+  existingBanner: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+    backgroundColor: "#FEF3D9",
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#F2D48A",
+  },
+  existingBannerText: {
+    fontSize: 13,
+    color: "#8B6914",
+    fontWeight: "500" as const,
+    flex: 1,
   },
 });

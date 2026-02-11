@@ -6,6 +6,21 @@ export interface Recipe {
   imageUrl: string;
   ingredients: Ingredient[];
   createdAt: string;
+  isPublic?: boolean;
+  userId?: string;
+  authorName?: string;
+}
+
+export interface PublicRecipe {
+  id: string;
+  user_id: string;
+  title: string;
+  url: string;
+  source: string;
+  image_url: string;
+  ingredients: Ingredient[];
+  author_name: string;
+  created_at: string;
 }
 
 export interface Ingredient {
@@ -35,6 +50,18 @@ export interface GroceryList {
   recipeTitle: string;
   items: GroceryItem[];
   createdAt: string;
+  shareCode?: string;
+}
+
+export interface SharedGroceryList {
+  id: string;
+  share_code: string;
+  recipe_id: string;
+  recipe_title: string;
+  items: GroceryItem[];
+  created_by: string;
+  author_name: string;
+  created_at: string;
 }
 
 export interface GroceryItem {

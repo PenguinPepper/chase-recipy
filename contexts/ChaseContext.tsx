@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState } from "react";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { publishRecipe, unpublishRecipe } from "@/lib/publicRecipes";
+import { shareGroceryList } from "@/lib/sharedGrocery";
 import { Recipe, GroceryList, GroceryItem, PantryItem, Ingredient } from "@/types";
 
 const RECIPES_KEY = "chase_recipes";
@@ -173,23 +175,44 @@ export const [ChaseProvider, useChase] = createContextHook(() => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["pantry", userId] }),
   });
 
+  const displayName = user?.user_metadata?.display_name || user?.email?.split("@")[0] || "Chef";
+
   const addRecipe = useCallback(
     (recipe: Omit<Recipe, "id" | "createdAt">) => {
       const newRecipe: Recipe = {
         ...recipe,
         id: generateId(),
         createdAt: new Date().toISOString(),
+        userId: userId || undefined,
+        authorName: displayName,
       };
       const updated = [newRecipe, ...recipes];
       setRecipes(updated);
       saveRecipes(updated);
+
+      if (newRecipe.isPublic && userId) {
+        publishRecipe({
+          id: newRecipe.id,
+          userId,
+          title: newRecipe.title,
+          url: newRecipe.url,
+          source: newRecipe.source,
+          imageUrl: newRecipe.imageUrl,
+          ingredients: newRecipe.ingredients,
+          authorName: displayName,
+        }).catch((err) => console.log("[Chase] Publish error:", err));
+      }
       return newRecipe;
     },
-    [recipes, saveRecipes]
+    [recipes, saveRecipes, userId, displayName]
   );
 
   const deleteRecipe = useCallback(
     (id: string) => {
+      const recipe = recipes.find((r) => r.id === id);
+      if (recipe?.isPublic) {
+        unpublishRecipe(id).catch((err) => console.log("[Chase] Unpublish error:", err));
+      }
       const updatedRecipes = recipes.filter((r) => r.id !== id);
       setRecipes(updatedRecipes);
       saveRecipes(updatedRecipes);
@@ -198,6 +221,36 @@ export const [ChaseProvider, useChase] = createContextHook(() => {
       saveGrocery(updatedLists);
     },
     [recipes, groceryLists, saveRecipes, saveGrocery]
+  );
+
+  const toggleRecipePublic = useCallback(
+    (id: string) => {
+      const recipe = recipes.find((r) => r.id === id);
+      if (!recipe || !userId) return;
+
+      const newPublic = !recipe.isPublic;
+      const updated = recipes.map((r) =>
+        r.id === id ? { ...r, isPublic: newPublic } : r
+      );
+      setRecipes(updated);
+      saveRecipes(updated);
+
+      if (newPublic) {
+        publishRecipe({
+          id: recipe.id,
+          userId,
+          title: recipe.title,
+          url: recipe.url,
+          source: recipe.source,
+          imageUrl: recipe.imageUrl,
+          ingredients: recipe.ingredients,
+          authorName: displayName,
+        }).catch((err) => console.log("[Chase] Publish error:", err));
+      } else {
+        unpublishRecipe(id).catch((err) => console.log("[Chase] Unpublish error:", err));
+      }
+    },
+    [recipes, saveRecipes, userId, displayName]
   );
 
   const generateGroceryList = useCallback(
@@ -218,6 +271,62 @@ export const [ChaseProvider, useChase] = createContextHook(() => {
         id: generateId(),
         recipeId: recipe.id,
         recipeTitle: recipe.title,
+        items,
+        createdAt: new Date().toISOString(),
+      };
+
+      const updated = [newList, ...groceryLists];
+      setGroceryLists(updated);
+      saveGrocery(updated);
+      return newList;
+    },
+    [pantryItems, groceryLists, saveGrocery]
+  );
+
+  const shareList = useCallback(
+    async (listId: string): Promise<string> => {
+      const list = groceryLists.find((g) => g.id === listId);
+      if (!list) throw new Error("List not found");
+      if (!userId) throw new Error("Not authenticated");
+
+      if (list.shareCode) {
+        console.log("[Chase] List already shared with code:", list.shareCode);
+        return list.shareCode;
+      }
+
+      const code = await shareGroceryList({
+        id: list.id,
+        recipeId: list.recipeId,
+        recipeTitle: list.recipeTitle,
+        items: list.items,
+        createdBy: userId,
+        authorName: displayName,
+      });
+
+      const updated = groceryLists.map((g) =>
+        g.id === listId ? { ...g, shareCode: code } : g
+      );
+      setGroceryLists(updated);
+      saveGrocery(updated);
+      return code;
+    },
+    [groceryLists, saveGrocery, userId, displayName]
+  );
+
+  const importSharedList = useCallback(
+    (sharedList: { recipeTitle: string; items: GroceryItem[] }) => {
+      const pantryNames = pantryItems.map((p) => p.name.toLowerCase());
+      const items: GroceryItem[] = sharedList.items.map((item) => ({
+        ...item,
+        id: generateId(),
+        checked: false,
+        inPantry: pantryNames.includes(item.name.toLowerCase()),
+      }));
+
+      const newList: GroceryList = {
+        id: generateId(),
+        recipeId: "",
+        recipeTitle: sharedList.recipeTitle,
         items,
         createdAt: new Date().toISOString(),
       };
@@ -306,11 +415,14 @@ export const [ChaseProvider, useChase] = createContextHook(() => {
     isLoading,
     addRecipe,
     deleteRecipe,
+    toggleRecipePublic,
     generateGroceryList,
     toggleGroceryItem,
     deleteGroceryList,
     addPantryItem,
     removePantryItem,
     checkRecipeAgainstPantry,
+    shareList,
+    importSharedList,
   };
 });
