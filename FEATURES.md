@@ -2,7 +2,7 @@
 
 ## Overview
 
-Chase is a cross-platform mobile recipe management app built with React Native and Expo. It allows users to save recipes from the web, manage grocery lists, track pantry inventory, and share with the community — all backed by Supabase for authentication and cloud persistence.
+Chase is a cross-platform mobile recipe management app built with React Native and Expo. It allows users to save recipes from the web, manage grocery lists, track pantry inventory, estimate recipe costs, and share with the community — all backed by Supabase for authentication and cloud persistence.
 
 ---
 
@@ -81,6 +81,32 @@ Chase is a cross-platform mobile recipe management app built with React Native a
 
 ---
 
+## Ingredient Normalization
+
+- **Automatic ingredient name normalization** — common ingredient names are mapped to their standard grocery store equivalents (e.g., "flour" → "all-purpose flour", "sugar" → "granulated white sugar")
+- **Default quantity and unit assignment** — normalized ingredients receive sensible default quantities and units when not specified
+- **Extensive normalization map** — covers flours, sugars, dairy, oils, vinegars, spices, sauces, proteins, produce, grains, and more
+- **Fuzzy matching** — handles common abbreviations and regional name variations (e.g., "ap flour", "icing sugar", "coriander" → "cilantro")
+
+---
+
+## Cost Estimation
+
+- **Recipe cost estimator** — estimate the total cost of a recipe by querying real grocery store prices
+- **Multi-store price comparison** — fetches prices from Walmart, Target, and Kroger via Zyte API for structured e-commerce data extraction
+- **Smart grocery search terms** — ingredient names are mapped to optimized search queries for better product matching (e.g., "all-purpose flour" → "all purpose flour 5lb")
+- **Best match selection** — automatically selects the cheapest or most relevant product match per ingredient
+- **Unit price calculation** — converts prices to a consistent per-unit basis (per kg, per liter, per unit) for fair comparison
+- **Per-ingredient price breakdown** — view matched product name, price, store, and unit size for each ingredient
+- **Store breakdown summary** — see total estimated cost per store with item counts and missing item counts
+- **Total recipe cost** — aggregated estimated cost across all ingredients
+- **Expandable ingredient details** — tap to see all product matches for any ingredient with links to the store page
+- **Loading state per ingredient** — individual progress indicators as prices are fetched
+- **Error handling** — graceful fallback when price data is unavailable for an ingredient
+- **Refresh pricing** — re-fetch all prices on demand
+
+---
+
 ## Data Persistence & Sync
 
 - **Local storage** via AsyncStorage for offline access
@@ -105,6 +131,16 @@ Chase is a cross-platform mobile recipe management app built with React Native a
 
 ---
 
+## tRPC Backend
+
+- **Server-side price fetching** — tRPC router with a `searchIngredientPrice` procedure that queries grocery stores via the Zyte API
+- **Zyte API integration** — uses Zyte's structured data extraction to scrape product listings from major grocery retailers
+- **Product data parsing** — extracts product name, price, currency, unit size, and image from structured e-commerce responses
+- **Unit size normalization** — parses product names and descriptions to determine weight/volume and calculates per-unit pricing
+- **Multi-store querying** — searches across Walmart, Target, and Kroger for each ingredient
+
+---
+
 ## UI/UX
 
 - **Tab-based navigation** with 5 tabs: Recipes, Explore, Groceries, Pantry, Profile
@@ -125,8 +161,9 @@ Chase is a cross-platform mobile recipe management app built with React Native a
 - **Framework**: React Native with Expo (SDK 54)
 - **Routing**: Expo Router (file-based)
 - **State Management**: React Query + createContextHook (@nkzw/create-context-hook)
-- **Backend**: Supabase (Auth + Database)
+- **Backend**: Supabase (Auth + Database), tRPC (Hono server)
 - **AI/ML**: AssemblyAI for video transcription
+- **Web Scraping**: Zyte API for structured e-commerce data extraction
 - **Local Storage**: AsyncStorage
 - **UI**: StyleSheet, lucide-react-native icons, expo-image
 - **Language**: TypeScript (strict)
