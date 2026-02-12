@@ -81,3 +81,41 @@ export interface PantryItem {
   category: IngredientCategory;
   addedAt: string;
 }
+
+export interface ProductMatch {
+  name: string;
+  price: number;
+  currency: string;
+  unitSize: string;
+  unitPrice: number;
+  unitLabel: string;
+  store: string;
+  url: string;
+  imageUrl?: string;
+}
+
+export interface IngredientPrice {
+  ingredientId: string;
+  ingredientName: string;
+  searchTerm: string;
+  matches: ProductMatch[];
+  bestMatch: ProductMatch | null;
+  status: 'pending' | 'loading' | 'done' | 'error';
+  error?: string;
+}
+
+export interface RecipeCostEstimate {
+  recipeId: string;
+  ingredientPrices: IngredientPrice[];
+  totalEstimated: number;
+  currency: string;
+  storeBreakdown: StoreBreakdown[];
+  fetchedAt: string;
+}
+
+export interface StoreBreakdown {
+  store: string;
+  total: number;
+  itemCount: number;
+  missingCount: number;
+}

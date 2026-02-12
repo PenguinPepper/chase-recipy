@@ -20,6 +20,7 @@ import {
   Alert,
 } from "react-native";
 
+import CostEstimator from "@/components/CostEstimator";
 import Colors from "@/constants/colors";
 import { useChase } from "@/contexts/ChaseContext";
 import { Ingredient } from "@/types";
@@ -238,6 +239,11 @@ export default function RecipeDetailScreen() {
               ))}
             </View>
           ))}
+
+          <CostEstimator
+            ingredients={recipe.ingredients}
+            recipeId={recipe.id}
+          />
         </View>
       </ScrollView>
     </View>
