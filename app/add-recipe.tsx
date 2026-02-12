@@ -45,6 +45,10 @@ import {
   RecipeMetadata,
 } from "@/utils/recipeExtractor";
 import {
+  normalizeIngredients,
+  hasNormalizablIngredients,
+} from "@/utils/ingredientNormalizer";
+import {
   isVideoUrl,
   isInstagramUrl,
   extractVideoRecipe,
@@ -71,6 +75,7 @@ export default function AddRecipeScreen() {
   const [transcriptExpanded, setTranscriptExpanded] = useState<boolean>(false);
   const [isPublic, setIsPublic] = useState<boolean>(false);
   const [foundExisting, setFoundExisting] = useState<PublicRecipe | null>(null);
+  const [normalizedCount, setNormalizedCount] = useState<number>(0);
   const spinAnim = useRef(new Animated.Value(0)).current;
   const ingredientInputRef = useRef<TextInput>(null);
 
@@ -596,7 +601,33 @@ export default function AddRecipeScreen() {
           </View>
         )}
 
-        <Text style={styles.sectionLabel}>Ingredients</Text>
+        <View style={styles.ingredientHeaderRow}>
+          <Text style={styles.sectionLabel}>Ingredients</Text>
+          {ingredients.length > 0 && hasNormalizablIngredients(ingredients) && normalizedCount === 0 && (
+            <TouchableOpacity
+              style={styles.normalizeButton}
+              onPress={() => {
+                const result = normalizeIngredients(ingredients);
+                setIngredients(result.ingredients);
+                setNormalizedCount(result.normalizedCount);
+              }}
+              activeOpacity={0.7}
+              testID="normalize-ingredients"
+            >
+              <Sparkles size={13} color={Colors.accent} />
+              <Text style={styles.normalizeButtonText}>Normalize</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {normalizedCount > 0 && (
+          <View style={styles.normalizedBanner}>
+            <Sparkles size={14} color={Colors.accent} />
+            <Text style={styles.normalizedBannerText}>
+              {normalizedCount} ingredient{normalizedCount !== 1 ? "s" : ""} normalized to standard forms
+            </Text>
+          </View>
+        )}
 
         {ingredients.map((ing) => (
           <View key={ing.id} style={styles.ingredientItem}>
@@ -1160,11 +1191,49 @@ const styles = StyleSheet.create({
     color: Colors.inPantryText,
     fontWeight: "600" as const,
   },
+  ingredientHeaderRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "space-between" as const,
+    marginBottom: 12,
+  },
   sectionLabel: {
     fontSize: 16,
     fontWeight: "700" as const,
     color: Colors.text,
+  },
+  normalizeButton: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 5,
+    backgroundColor: "#FFF8EE",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.accentWarm,
+  },
+  normalizeButtonText: {
+    fontSize: 12,
+    fontWeight: "700" as const,
+    color: Colors.accent,
+  },
+  normalizedBanner: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+    backgroundColor: "#FFF8EE",
+    padding: 12,
+    borderRadius: 10,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: Colors.accentWarm,
+  },
+  normalizedBannerText: {
+    fontSize: 13,
+    color: "#8B6914",
+    fontWeight: "600" as const,
+    flex: 1,
   },
   ingredientItem: {
     flexDirection: "row",

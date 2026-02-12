@@ -1,4 +1,5 @@
 import { Ingredient, IngredientCategory } from "@/types";
+import { normalizeIngredient } from "@/utils/ingredientNormalizer";
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
@@ -102,13 +103,16 @@ export function parseIngredientString(raw: string): { name: string; quantity: st
 
 export function createIngredientFromText(text: string): Ingredient {
   const parsed = parseIngredientString(text);
-  return {
+  const raw: Ingredient = {
     id: generateId(),
     name: parsed.name,
     quantity: parsed.quantity,
     unit: parsed.unit,
     category: categorizeIngredient(parsed.name),
   };
+  const { ingredient: normalized } = normalizeIngredient(raw);
+  normalized.category = categorizeIngredient(normalized.name);
+  return normalized;
 }
 
 export interface RecipeMetadata {
