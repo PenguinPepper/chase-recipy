@@ -8,7 +8,7 @@ import {
   AlertCircle,
   Tag,
 } from "lucide-react-native";
-import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import React, { useState, useCallback, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -74,7 +74,7 @@ interface PriceResults {
 
 const ZYTE_API_KEY = process.env.EXPO_PUBLIC_ZYTE_API_KEY || "";
 
-export default function CostEstimator({ ingredients, recipeId }: CostEstimatorProps) {
+export default function CostEstimator({ ingredients }: CostEstimatorProps) {
   const [results, setResults] = useState<PriceResults | null>(null);
   const [expandedIngredient, setExpandedIngredient] = useState<string | null>(null);
   const [showStoreBreakdown, setShowStoreBreakdown] = useState(false);
@@ -101,6 +101,7 @@ export default function CostEstimator({ ingredients, recipeId }: CostEstimatorPr
     onError: (error) => {
       console.log("[CostEstimator] Error:", error.message);
     },
+    retry: false,
   });
 
   const handleEstimateCost = useCallback(() => {
@@ -193,7 +194,10 @@ export default function CostEstimator({ ingredients, recipeId }: CostEstimatorPr
         <View style={styles.errorContainer}>
           <AlertCircle size={18} color={Colors.error} />
           <Text style={styles.errorText}>
-            Failed to fetch prices. Please try again.
+            Unable to connect to price service.
+          </Text>
+          <Text style={styles.errorSubtext}>
+            Please check your connection and try again.
           </Text>
           <TouchableOpacity
             style={styles.retryButton}
@@ -347,7 +351,9 @@ export default function CostEstimator({ ingredients, recipeId }: CostEstimatorPr
                           key={`${match.store}-${idx}`}
                           style={styles.altMatchRow}
                           onPress={() => {
-                            if (match.url) Linking.openURL(match.url);
+                            if (match.url) {
+                              Linking.openURL(match.url).catch(() => {});
+                            }
                           }}
                           activeOpacity={0.7}
                         >
@@ -472,6 +478,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.error,
     textAlign: "center",
+  },
+  errorSubtext: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    marginTop: 4,
   },
   retryButton: {
     flexDirection: "row",

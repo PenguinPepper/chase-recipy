@@ -18,23 +18,25 @@ const getBaseUrl = () => {
   return url;
 };
 
+const fetchWithFallback = async (input: RequestInfo | URL, init?: RequestInit) => {
+  try {
+    const response = await fetch(input, init);
+    if (!response.ok) {
+      console.error(`[tRPC] HTTP error ${response.status}: ${response.statusText}`);
+    }
+    return response;
+  } catch (error) {
+    console.error("[tRPC] Fetch failed - backend may be unavailable:", error);
+    throw error;
+  }
+};
+
 export const trpcClient = trpc.createClient({
   links: [
     httpLink({
       url: `${getBaseUrl()}/api/trpc`,
       transformer: superjson,
-      fetch: async (input, init) => {
-        try {
-          const response = await fetch(input, init);
-          if (!response.ok) {
-            console.error(`[tRPC] HTTP error ${response.status}: ${response.statusText}`);
-          }
-          return response;
-        } catch (error) {
-          console.error("[tRPC] Fetch failed:", error);
-          throw error;
-        }
-      },
+      fetch: fetchWithFallback,
     }),
   ],
 });
