@@ -14,7 +14,6 @@ Chase — Recipe Organizer
 6. [Environment Variables](#environment-variables)
 7. [Architecture Overview](#architecture-overview)
 8. [Key Workflows](#key-workflows)
-9. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -245,7 +244,3 @@ CostEstimator.tsx  <------  Best match + unit-price calc
 1. User opens a grocery list and taps **Share**.
 2. A 6-character share code is generated and stored in `shared_grocery_lists`.
 3. Another user enters the code → list is cloned into their account.
-
-eas build --platform android
-eas submit --platform android
-```
