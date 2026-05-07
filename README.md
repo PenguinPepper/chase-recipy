@@ -32,9 +32,9 @@ Chase helps home cooks go from "I saw a recipe online" to "I know exactly what t
 ## Features
 
 - **Recipe Management**
-- **Grocery Lists **
+- **Grocery Lists**
 - **Pantry Management**
-- **Cost Estimation **
+- **Cost Estimation**
 - **Community & Social recipe management**
 - **Authentication & Sync**
 
