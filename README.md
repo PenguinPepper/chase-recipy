@@ -1,12 +1,12 @@
-Chase — Recipe Organizer
+# Chase Recipy Organizer
 
-**Chase** is a cross-platform mobile app for saving recipes from the web, managing grocery lists, tracking pantry inventory, and estimating recipe costs in real time. Built with React Native and Expo, it runs on iOS, Android, and web from a single TypeScript codebase.
+**Chase Recipy** is a cross-platform mobile app for saving recipes from the web, managing grocery lists, tracking pantry inventory, and estimating recipe costs in real time. Built with React Native and Expo, it runs on iOS, Android, and web from a single TypeScript codebase.
 
 ---
 
 ## Table of Contents
 
-1. [What is Chase?](#what-is-chase)
+1. [What is Chase Recipy?](#what-is-chase)
 2. [Features](#features)
 3. [Tech Stack](#tech-stack)
 4. [Project Structure](#project-structure)
@@ -17,9 +17,9 @@ Chase — Recipe Organizer
 
 ---
 
-## What is Chase?
+## What is Chase Recipy?
 
-Chase helps home cooks go from "I saw a recipe online" to "I know exactly what to buy and how much it costs." Users can:
+Chase Recipy helps home cooks go from "I saw a recipe online" to "I know exactly what to buy and how much it costs." Users can:
 
 - Paste a recipe URL, YouTube link, or Instagram Reel to auto-extract ingredients.
 - Build a smart grocery list that skips items already in the pantry.
